@@ -108,8 +108,7 @@ class HacsRefreshScheduler:
 
         if self.runtime.refresh_in_progress:
             _LOGGER.debug(
-                "Skipping scheduled HACS refresh because "
-                "another refresh is already in progress"
+                "Skipping scheduled HACS refresh because another refresh is already in progress"
             )
             return
 
