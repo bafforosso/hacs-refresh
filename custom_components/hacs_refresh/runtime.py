@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,6 +14,10 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class HacsRefreshSkipped(HomeAssistantError):
+    """Raised when a refresh should be skipped."""
 
 
 class HacsRefreshRuntimeData:
@@ -32,7 +37,7 @@ class HacsRefreshRuntimeData:
 
         self.state = "idle"
 
-        self.last_refresh = None
+        self.last_refresh: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
         self.last_error: str | None = None
@@ -69,19 +74,39 @@ class HacsRefreshRuntimeData:
         for listener in tuple(self._listeners):
             listener()
 
-    async def async_refresh(self, *, source: str) -> None:
+    async def async_refresh(
+        self,
+        *,
+        source: str,
+    ) -> None:
         """Force-refresh all installed HACS repositories."""
         if self.refresh_in_progress:
-            raise HomeAssistantError(
+            if source == "scheduled":
+                _LOGGER.debug(
+                    "Scheduled HACS refresh skipped because "
+                    "another refresh is already in progress"
+                )
+                return
+
+            raise HacsRefreshSkipped(
                 "A HACS refresh is already in progress"
             )
 
         async with self._refresh_lock:
             try:
                 await self._async_do_refresh(source=source)
+            except HacsRefreshSkipped:
+                if source == "scheduled":
+                    _LOGGER.debug(
+                        "Scheduled HACS refresh skipped"
+                    )
+                    return
+                raise
             except HomeAssistantError:
                 if source == "scheduled":
-                    _LOGGER.error("Scheduled HACS refresh failed")
+                    _LOGGER.error(
+                        "Scheduled HACS refresh failed"
+                    )
                     return
                 raise
             except Exception as err:
@@ -93,29 +118,42 @@ class HacsRefreshRuntimeData:
                 self._notify_listeners()
 
                 if source == "scheduled":
-                    _LOGGER.exception("Scheduled HACS refresh failed")
+                    _LOGGER.exception(
+                        "Scheduled HACS refresh failed"
+                    )
                     return
 
                 raise HomeAssistantError(
-                    "Unexpected error while refreshing HACS repositories"
+                    "Unexpected error while refreshing "
+                    "HACS repositories"
                 ) from err
 
-    async def _async_do_refresh(self, *, source: str) -> None:
+    async def _async_do_refresh(
+        self,
+        *,
+        source: str,
+    ) -> None:
         """Perform a HACS refresh."""
         hacs = self.hass.data.get("hacs")
 
         if hacs is None:
-            raise HomeAssistantError("HACS is not available")
+            raise HomeAssistantError(
+                "HACS is not available"
+            )
 
         if hacs.system.disabled:
-            raise HomeAssistantError("HACS is disabled")
+            raise HomeAssistantError(
+                "HACS is disabled"
+            )
 
         if hacs.queue.running:
-            raise HomeAssistantError(
+            raise HacsRefreshSkipped(
                 "The HACS queue is already running"
             )
 
-        repositories = list(hacs.repositories.list_downloaded)
+        repositories = list(
+            hacs.repositories.list_downloaded
+        )
 
         self.state = "refreshing"
         self.last_source = source
@@ -132,17 +170,24 @@ class HacsRefreshRuntimeData:
             self.last_result = "success"
             self.last_pending = 0
             self._notify_listeners()
+
+            _LOGGER.debug(
+                "No installed HACS repositories found"
+            )
             return
 
         _LOGGER.debug(
-            "Starting forced refresh of %d installed HACS repositories",
+            "Starting forced refresh of %d installed "
+            "HACS repositories",
             len(repositories),
         )
 
         successful = 0
         failures: list[str] = []
 
-        async def refresh_repository(repository: Any) -> None:
+        async def refresh_repository(
+            repository: Any,
+        ) -> None:
             """Refresh one repository and record its result."""
             nonlocal successful
 
@@ -157,9 +202,11 @@ class HacsRefreshRuntimeData:
                     "full_name",
                     str(repository),
                 )
+
                 failures.append(
                     f"{repository_name}: {err}"
                 )
+
                 raise
 
             successful += 1
@@ -189,12 +236,15 @@ class HacsRefreshRuntimeData:
         if pending:
             self.last_result = "partial"
             self.last_error = (
-                f"{pending} repository refresh task(s) remain "
-                "pending in the HACS queue"
+                f"{pending} repository refresh task(s) "
+                "remain pending"
             )
         elif failures:
             self.last_result = "failed"
-            self.last_error = "; ".join(failures)
+            self.last_error = (
+                f"{len(failures)} repository refresh "
+                "task(s) failed"
+            )
         else:
             self.last_result = "success"
             self.last_error = None
@@ -203,12 +253,14 @@ class HacsRefreshRuntimeData:
 
         if pending:
             _LOGGER.warning(
-                "HACS refresh finished with %d repositories still "
-                "pending in the HACS queue",
+                "HACS refresh finished with %d repositories "
+                "still pending in the HACS queue",
                 pending,
             )
+
             raise HomeAssistantError(
-                f"{pending} HACS refresh task(s) remain pending"
+                f"{pending} HACS refresh task(s) "
+                "remain pending"
             )
 
         if failures:
@@ -217,12 +269,20 @@ class HacsRefreshRuntimeData:
                 len(failures),
                 len(repositories),
             )
+
+            for failure in failures:
+                _LOGGER.error(
+                    "HACS repository refresh failed: %s",
+                    failure,
+                )
+
             raise HomeAssistantError(
                 f"{len(failures)} of {len(repositories)} "
                 "HACS repository refreshes failed"
             )
 
         _LOGGER.debug(
-            "HACS forced refresh completed successfully for %d repositories",
+            "HACS forced refresh completed successfully "
+            "for %d repositories",
             len(repositories),
         )

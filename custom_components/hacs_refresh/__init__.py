@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -15,8 +14,6 @@ from homeassistant.exceptions import (
 from .const import DOMAIN, SERVICE_REFRESH
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
-
-_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
 
@@ -45,6 +42,7 @@ async def async_setup(
             )
 
         entry = entries[0]
+
         runtime: HacsRefreshRuntimeData = (
             entry.runtime_data
         )

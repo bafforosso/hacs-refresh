@@ -27,7 +27,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HACS Refresh sensor."""
-    runtime: HacsRefreshRuntimeData = entry.runtime_data
+    runtime: HacsRefreshRuntimeData = (
+        entry.runtime_data
+    )
 
     async_add_entities(
         [HacsRefreshStatusSensor(runtime)]
@@ -50,8 +52,10 @@ class HacsRefreshStatusSensor(SensorEntity):
         """Initialize the sensor."""
         self.runtime = runtime
 
-        self._remove_listener = runtime.add_listener(
-            self._async_runtime_updated
+        self._remove_listener = (
+            runtime.add_listener(
+                self._async_runtime_updated
+            )
         )
 
     @property
@@ -60,7 +64,9 @@ class HacsRefreshStatusSensor(SensorEntity):
         return self.runtime.state
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
+    def extra_state_attributes(
+        self,
+    ) -> dict[str, Any]:
         """Return diagnostic attributes."""
         options = self.runtime.options
 
@@ -85,8 +91,12 @@ class HacsRefreshStatusSensor(SensorEntity):
             ),
             "last_result": self.runtime.last_result,
             "last_source": self.runtime.last_source,
-            "repositories": self.runtime.last_repositories,
-            "successful": self.runtime.last_successful,
+            "repositories": (
+                self.runtime.last_repositories
+            ),
+            "successful": (
+                self.runtime.last_successful
+            ),
             "failed": self.runtime.last_failed,
             "pending": self.runtime.last_pending,
             "last_error": self.runtime.last_error,
@@ -107,8 +117,13 @@ class HacsRefreshStatusSensor(SensorEntity):
         ):
             return None
 
-        days = set(options.get(CONF_DAYS, []))
-        times = options.get(CONF_TIMES, [])
+        days = set(
+            options.get(CONF_DAYS, [])
+        )
+        times = options.get(
+            CONF_TIMES,
+            [],
+        )
 
         if not days or not times:
             return None
@@ -145,14 +160,19 @@ class HacsRefreshStatusSensor(SensorEntity):
                 )
 
                 if candidate > now:
-                    candidates.append(candidate)
+                    candidates.append(
+                        candidate
+                    )
 
         if not candidates:
             return None
 
         return min(candidates).isoformat()
 
-    async def async_will_remove_from_hass(self) -> None:
+    async def async_will_remove_from_hass(
+        self,
+    ) -> None:
         """Clean up runtime listeners."""
         self._remove_listener()
+
         await super().async_will_remove_from_hass()

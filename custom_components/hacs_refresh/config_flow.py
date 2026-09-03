@@ -76,7 +76,10 @@ class HacsRefreshOptionsFlow(
                 times = []
                 errors[CONF_TIMES] = "invalid_time"
 
-            days = user_input.get(CONF_DAYS, [])
+            days = user_input.get(
+                CONF_DAYS,
+                [],
+            )
 
             if not days:
                 errors[CONF_DAYS] = "no_days"
@@ -170,7 +173,9 @@ class HacsRefreshOptionsFlow(
         )
 
 
-def _parse_times(value: str) -> list[str]:
+def _parse_times(
+    value: str,
+) -> list[str]:
     """Parse and normalize comma-separated HH:MM times."""
     if not isinstance(value, str):
         raise ValueError

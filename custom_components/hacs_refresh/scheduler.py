@@ -5,12 +5,17 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
 
-from .const import CONF_AUTOMATIC_REFRESH, CONF_DAYS, CONF_TIMES, WEEKDAYS
+from .const import (
+    CONF_AUTOMATIC_REFRESH,
+    CONF_DAYS,
+    CONF_TIMES,
+    WEEKDAYS,
+)
+from .runtime import HacsRefreshRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,12 +26,15 @@ class HacsRefreshScheduler:
     def __init__(
         self,
         hass: HomeAssistant,
-        runtime: Any,
+        runtime: HacsRefreshRuntimeData,
     ) -> None:
         """Initialize the scheduler."""
         self.hass = hass
         self.runtime = runtime
-        self._unsubscribers: list[Callable[[], None]] = []
+
+        self._unsubscribers: list[
+            Callable[[], None]
+        ] = []
 
     async def async_setup(self) -> None:
         """Set up the configured schedule."""
@@ -43,7 +51,10 @@ class HacsRefreshScheduler:
             )
             return
 
-        for time_string in options.get(CONF_TIMES, []):
+        for time_string in options.get(
+            CONF_TIMES,
+            [],
+        ):
             hour, minute = (
                 int(value)
                 for value in time_string.split(":")
@@ -60,7 +71,8 @@ class HacsRefreshScheduler:
             )
 
         _LOGGER.debug(
-            "Configured HACS automatic refresh: days=%s times=%s",
+            "Configured HACS automatic refresh: "
+            "days=%s times=%s",
             options.get(CONF_DAYS, []),
             options.get(CONF_TIMES, []),
         )
@@ -87,24 +99,22 @@ class HacsRefreshScheduler:
         ):
             return
 
-        days = set(options.get(CONF_DAYS, []))
+        days = set(
+            options.get(CONF_DAYS, [])
+        )
 
         if WEEKDAYS[now.weekday()] not in days:
             return
 
         if self.runtime.refresh_in_progress:
             _LOGGER.debug(
-                "Skipping scheduled HACS refresh because another "
-                "refresh is already in progress"
+                "Skipping scheduled HACS refresh because "
+                "another refresh is already in progress"
             )
             return
 
         self.hass.async_create_task(
-            self._async_run_scheduled_refresh()
-        )
-
-    async def _async_run_scheduled_refresh(self) -> None:
-        """Run a scheduled refresh."""
-        await self.runtime.async_refresh(
-            source="scheduled"
+            self.runtime.async_refresh(
+                source="scheduled"
+            )
         )
