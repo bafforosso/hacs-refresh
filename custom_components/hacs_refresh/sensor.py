@@ -8,7 +8,10 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.device_registry import (
+    DeviceEntryType,
+    DeviceInfo,
+)
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -42,7 +45,7 @@ class HacsRefreshStatusSensor(SensorEntity):
     """Represent HACS Refresh status."""
 
     _attr_has_entity_name = True
-    _attr_name = "Status"
+    _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
     _attr_unique_id = "hacs_refresh_status"
@@ -56,7 +59,7 @@ class HacsRefreshStatusSensor(SensorEntity):
 
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, runtime.entry.entry_id)},
-            name="HACS Refresh",
+            translation_key="hacs_refresh",
             entry_type=DeviceEntryType.SERVICE,
         )
 
@@ -99,12 +102,8 @@ class HacsRefreshStatusSensor(SensorEntity):
             ),
             "last_result": self.runtime.last_result,
             "last_source": self.runtime.last_source,
-            "repositories": (
-                self.runtime.last_repositories
-            ),
-            "successful": (
-                self.runtime.last_successful
-            ),
+            "repositories": self.runtime.last_repositories,
+            "successful": self.runtime.last_successful,
             "failed": self.runtime.last_failed,
             "pending": self.runtime.last_pending,
             "last_error": self.runtime.last_error,
@@ -126,7 +125,10 @@ class HacsRefreshStatusSensor(SensorEntity):
             return None
 
         days = set(
-            options.get(CONF_DAYS, [])
+            options.get(
+                CONF_DAYS,
+                [],
+            )
         )
         times = options.get(
             CONF_TIMES,
@@ -168,9 +170,7 @@ class HacsRefreshStatusSensor(SensorEntity):
                 )
 
                 if candidate > now:
-                    candidates.append(
-                        candidate
-                    )
+                    candidates.append(candidate)
 
         if not candidates:
             return None

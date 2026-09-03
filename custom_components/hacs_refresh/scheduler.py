@@ -71,8 +71,7 @@ class HacsRefreshScheduler:
             )
 
         _LOGGER.debug(
-            "Configured HACS automatic refresh: "
-            "days=%s times=%s",
+            "Configured HACS automatic refresh: days=%s times=%s",
             options.get(CONF_DAYS, []),
             options.get(CONF_TIMES, []),
         )
@@ -100,7 +99,10 @@ class HacsRefreshScheduler:
             return
 
         days = set(
-            options.get(CONF_DAYS, [])
+            options.get(
+                CONF_DAYS,
+                [],
+            )
         )
 
         if WEEKDAYS[now.weekday()] not in days:

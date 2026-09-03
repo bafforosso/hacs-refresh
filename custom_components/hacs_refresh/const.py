@@ -1,7 +1,6 @@
 """Constants for HACS Refresh."""
 
 DOMAIN = "hacs_refresh"
-
 SERVICE_REFRESH = "refresh"
 
 CONF_AUTOMATIC_REFRESH = "automatic_refresh"
@@ -18,7 +17,7 @@ WEEKDAYS = (
     "sun",
 )
 
-DEFAULT_AUTOMATIC_REFRESH = False
+DEFAULT_AUTOMATIC_REFRESH = True
 DEFAULT_DAYS = list(WEEKDAYS)
 DEFAULT_TIMES = ["03:00"]
 

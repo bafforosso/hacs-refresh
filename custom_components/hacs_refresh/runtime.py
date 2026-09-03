@@ -36,7 +36,6 @@ class HacsRefreshRuntimeData:
         self._listeners: set[Callable[[], None]] = set()
 
         self.state = "idle"
-
         self.last_refresh: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
@@ -69,8 +68,8 @@ class HacsRefreshRuntimeData:
 
         return remove_listener
 
-    def _notify_listeners(self) -> None:
-        """Notify listeners of a runtime state change."""
+    def notify_listeners(self) -> None:
+        """Notify listeners of a runtime or configuration change."""
         for listener in tuple(self._listeners):
             listener()
 
@@ -114,7 +113,7 @@ class HacsRefreshRuntimeData:
                 self.last_result = "failed"
                 self.last_source = source
                 self.last_error = str(err)
-                self._notify_listeners()
+                self.notify_listeners()
 
                 if source == "scheduled":
                     _LOGGER.exception(
@@ -166,14 +165,16 @@ class HacsRefreshRuntimeData:
         self.last_successful = 0
         self.last_failed = 0
         self.last_pending = len(repositories)
-        self._notify_listeners()
+
+        self.notify_listeners()
 
         if not repositories:
             self.state = "idle"
             self.last_refresh = dt_util.now()
             self.last_result = "success"
             self.last_pending = 0
-            self._notify_listeners()
+
+            self.notify_listeners()
 
             _LOGGER.debug(
                 "No installed HACS repositories found"
@@ -250,7 +251,7 @@ class HacsRefreshRuntimeData:
             self.last_result = "success"
             self.last_error = None
 
-        self._notify_listeners()
+        self.notify_listeners()
 
         if pending:
             _LOGGER.warning(

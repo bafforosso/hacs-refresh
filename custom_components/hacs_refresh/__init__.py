@@ -86,6 +86,20 @@ async def async_setup_entry(
         scheduler.async_unload
     )
 
+    async def _async_options_updated(
+        hass: HomeAssistant,
+        updated_entry: HacsRefreshConfigEntry,
+    ) -> None:
+        """Handle configuration option updates."""
+        await scheduler.async_setup()
+        runtime.notify_listeners()
+
+    entry.async_on_unload(
+        entry.add_update_listener(
+            _async_options_updated
+        )
+    )
+
     await scheduler.async_setup()
 
     await hass.config_entries.async_forward_entry_setups(
