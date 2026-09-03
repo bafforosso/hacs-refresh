@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -16,6 +17,7 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    DOMAIN,
     WEEKDAYS,
 )
 from .runtime import HacsRefreshRuntimeData
@@ -51,6 +53,12 @@ class HacsRefreshStatusSensor(SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         self.runtime = runtime
+
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, runtime.entry.entry_id)},
+            name="HACS Refresh",
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
         self._remove_listener = (
             runtime.add_listener(
