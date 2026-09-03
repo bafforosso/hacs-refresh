@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HACS Refresh",
+        "description": "HACS Refresh forces HACS to refresh the metadata of all installed HACS repositories."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HACS Refresh settings",
+        "description": "Configure automatic HACS repository metadata refreshes. The manual refresh action is always available regardless of the automatic refresh setting.",
+        "data": {
+          "automatic_refresh": "Enable automatic refresh",
+          "days": "Days of the week",
+          "times": "Refresh times"
+        },
+        "data_description": {
+          "automatic_refresh": "When enabled, HACS Refresh runs automatically according to the selected days and times.",
+          "days": "Select the days on which automatic refreshes should run.",
+          "times": "Enter one or more times in 24-hour HH:MM format, separated by commas. Example: 03:00, 15:00."
+        }
+      }
+    },
+    "error": {
+      "invalid_time": "Enter valid times using HH:MM format.",
+      "no_times": "At least one refresh time is required.",
+      "no_days": "Select at least one day.",
+      "too_many_times": "A maximum of 10 refresh times can be configured."
+    }
+  }
+}

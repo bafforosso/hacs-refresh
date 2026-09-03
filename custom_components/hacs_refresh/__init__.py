@@ -3,90 +3,54 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import (
+    ConfigEntryNotReady,
+    ServiceValidationError,
+)
 
-DOMAIN = "hacs_refresh"
-SERVICE_REFRESH = "refresh"
+from .const import DOMAIN, SERVICE_REFRESH
+from .runtime import HacsRefreshRuntimeData
+from .scheduler import HacsRefreshScheduler
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS = ["sensor"]
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the HACS Refresh integration."""
+type HacsRefreshConfigEntry = ConfigEntry[
+    HacsRefreshRuntimeData
+]
 
-    return True
 
-
-async def async_setup_entry(
+async def async_setup(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    config: dict[str, Any],
 ) -> bool:
-    """Set up HACS Refresh from a config entry."""
+    """Set up HACS Refresh."""
 
-    hacs = hass.data.get("hacs")
-
-    if hacs is None:
-        _LOGGER.error("HACS is not available")
-        return False
-
-    async def async_refresh(call: ServiceCall) -> None:
+    async def async_refresh(
+        call: ServiceCall,
+    ) -> None:
         """Force-refresh all installed HACS repositories."""
-
-        if hacs.system.disabled:
-            _LOGGER.error("HACS is disabled; refresh aborted")
-            return
-
-        if hacs.queue.running:
-            _LOGGER.error(
-                "HACS queue is already running; refresh aborted"
-            )
-            return
-
-        repositories = hacs.repositories.list_downloaded
-
-        if not repositories:
-            _LOGGER.debug("No installed HACS repositories found")
-            return
-
-        _LOGGER.debug(
-            "Starting forced refresh of %d installed HACS repositories",
-            len(repositories),
+        entries = hass.config_entries.async_loaded_entries(
+            DOMAIN
         )
 
-        for repository in repositories:
-            hacs.queue.add(
-                repository.update_repository(
-                    ignore_issues=True,
-                    force=True,
-                )
+        if not entries:
+            raise ServiceValidationError(
+                "HACS Refresh is not configured or loaded"
             )
 
-        try:
-            await hacs.async_process_queue()
-        except Exception:
-            _LOGGER.exception(
-                "Unexpected error while processing HACS refresh queue"
-            )
-            return
+        entry = entries[0]
+        runtime: HacsRefreshRuntimeData = (
+            entry.runtime_data
+        )
 
-        for coordinator in hacs.coordinators.values():
-            coordinator.async_update_listeners()
-
-        await hacs.data.async_write()
-
-        if hacs.queue.has_pending_tasks:
-            _LOGGER.warning(
-                "HACS refresh finished with %d repositories still "
-                "pending in the HACS queue",
-                hacs.queue.pending_tasks,
-            )
-            return
-
-        _LOGGER.debug(
-            "HACS forced refresh completed for %d repositories",
-            len(repositories),
+        await runtime.async_refresh(
+            source="manual"
         )
 
     hass.services.async_register(
@@ -98,12 +62,48 @@ async def async_setup_entry(
     return True
 
 
-async def async_unload_entry(
+async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HacsRefreshConfigEntry,
 ) -> bool:
-    """Unload HACS Refresh."""
+    """Set up HACS Refresh from a config entry."""
+    if hass.data.get("hacs") is None:
+        raise ConfigEntryNotReady(
+            "HACS is not available yet"
+        )
 
-    hass.services.async_remove(DOMAIN, SERVICE_REFRESH)
+    runtime = HacsRefreshRuntimeData(
+        hass,
+        entry,
+    )
+
+    entry.runtime_data = runtime
+
+    scheduler = HacsRefreshScheduler(
+        hass,
+        runtime,
+    )
+
+    entry.async_on_unload(
+        scheduler.async_unload
+    )
+
+    await scheduler.async_setup()
+
+    await hass.config_entries.async_forward_entry_setups(
+        entry,
+        PLATFORMS,
+    )
 
     return True
+
+
+async def async_unload_entry(
+    hass: HomeAssistant,
+    entry: HacsRefreshConfigEntry,
+) -> bool:
+    """Unload HACS Refresh."""
+    return await hass.config_entries.async_unload_platforms(
+        entry,
+        PLATFORMS,
+    )
