@@ -1,0 +1,15 @@
+{
+  "domain": "hacs_refresh",
+  "name": "HACS Refresh",
+  "version": "0.1.0",
+  "documentation": "https://github.com/bafforosso/hacs-refresh",
+  "issue_tracker": "https://github.com/bafforosso/hacs-refresh/issues",
+  "codeowners": [
+    "@bafforosso"
+  ],
+  "config_flow": false,
+  "dependencies": [
+    "hacs"
+  ],
+  "integration_type": "service"
+}
