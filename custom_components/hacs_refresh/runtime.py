@@ -13,6 +13,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
+from .const import(
+    MIN_REFRESH_INTERVAL,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -34,6 +38,7 @@ class HacsRefreshRuntimeData:
 
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()
+        self._last_refresh_started: datetime | None = None
 
         self.state = "idle"
         self.last_refresh: datetime | None = None
@@ -153,6 +158,19 @@ class HacsRefreshRuntimeData:
             raise HacsRefreshSkipped(
                 "The HACS queue is already running"
             )
+
+        now = dt_util.now()
+        if (
+            source == "scheduled"
+            and self._last_refresh_started is not None
+            and now - self._last_refresh_started < MIN_REFRESH_INTERVAL
+        ):
+            _LOGGER.debug(
+                "Scheduled HACS refresh skipped because the minimum refresh interval has not elapsed"
+            )
+            return
+
+        self._last_refresh_started = now
 
         repositories = list(
             hacs.repositories.list_downloaded

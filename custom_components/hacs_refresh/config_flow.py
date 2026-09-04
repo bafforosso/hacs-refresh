@@ -25,6 +25,7 @@ from .const import (
     DEFAULT_TIMES,
     DOMAIN,
     MAX_TIMES,
+    MIN_REFRESH_INTERVAL,
     WEEKDAYS,
 )
 
@@ -110,6 +111,11 @@ async def _validate_options(
     if len(times) > MAX_TIMES:
         raise SchemaFlowError("too_many_times")
 
+    try:
+        _validate_refresh_intervals(times)
+    except ValueError as err:
+        raise SchemaFlowError("times_too_close") from err
+
     return {
         CONF_AUTOMATIC_REFRESH: user_input[
             CONF_AUTOMATIC_REFRESH
@@ -157,6 +163,31 @@ def _parse_times(
         )
 
     return sorted(result)
+
+
+def _validate_refresh_intervals(times: list[str]) -> None:
+    """Validate the minimum interval between configured refresh times."""
+    if len(times) < 2:
+        return
+
+    minutes = sorted(
+        int(hour) * 60 + int(minute)
+        for hour, minute in (
+            time_string.split(":")
+            for time_string in times
+        )
+    )
+
+    minimum_minutes = int(MIN_REFRESH_INTERVAL.total_seconds() // 60)
+
+    for current, following in zip(minutes, minutes[1:]):
+        if following - current < minimum_minutes:
+            raise ValueError
+
+    overnight_interval = (24 * 60 - minutes[-1]) + minutes[0]
+
+    if overnight_interval < minimum_minutes:
+        raise ValueError
 
 
 CONFIG_FLOW = {

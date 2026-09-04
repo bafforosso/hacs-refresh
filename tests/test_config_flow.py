@@ -19,6 +19,7 @@ from custom_components.hacs_refresh.const import (
     DEFAULT_DAYS,
     DEFAULT_TIMES,
     MAX_TIMES,
+    MIN_REFRESH_INTERVAL,
 )
 
 
@@ -166,6 +167,54 @@ async def test_validate_options_rejects_too_many_times() -> None:
     with pytest.raises(
         SchemaFlowError,
         match="too_many_times",
+    ):
+        await _validate_options(
+            handler,
+            user_input,
+        )
+
+
+@pytest.mark.parametrize(
+    ("times", "valid"),
+    [
+        (["03:00"], True),
+        (["03:00", "03:10"], True),
+        (["03:00", "03:09"], False),
+        (["03:00", "03:11", "12:00"], True),
+        (["23:55", "00:04"], False),
+        (["23:55", "00:05"], True),
+    ],
+)
+def test_validate_refresh_intervals(
+    times: list[str],
+    valid: bool,
+) -> None:
+    """Test minimum intervals between configured refresh times."""
+    from custom_components.hacs_refresh.config_flow import (
+        _validate_refresh_intervals,
+    )
+
+    if valid:
+        _validate_refresh_intervals(times)
+    else:
+        with pytest.raises(ValueError):
+            _validate_refresh_intervals(times)
+
+
+async def test_validate_options_rejects_times_too_close() -> None:
+    """Test that refresh times closer than the minimum are rejected."""
+    handler = MagicMock()
+    handler.options = {}
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon"],
+        CONF_TIMES: "03:00, 03:09",
+    }
+
+    with pytest.raises(
+        SchemaFlowError,
+        match="times_too_close",
     ):
         await _validate_options(
             handler,

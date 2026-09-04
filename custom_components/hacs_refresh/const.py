@@ -1,11 +1,15 @@
 """Constants for HACS Refresh."""
 
+from datetime import timedelta
+
 DOMAIN = "hacs_refresh"
 SERVICE_REFRESH = "refresh"
 
 CONF_AUTOMATIC_REFRESH = "automatic_refresh"
 CONF_DAYS = "days"
 CONF_TIMES = "times"
+
+MIN_REFRESH_INTERVAL = timedelta(minutes=10)
 
 WEEKDAYS = (
     "mon",

@@ -1,5 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from homeassistant.core import HomeAssistant
@@ -7,7 +9,10 @@ from homeassistant.exceptions import HomeAssistantError
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.hacs_refresh.const import DOMAIN
+from custom_components.hacs_refresh.const import (
+    DOMAIN,
+    MIN_REFRESH_INTERVAL,
+)
 from custom_components.hacs_refresh.runtime import (
     HacsRefreshRuntimeData,
     HacsRefreshSkipped,
@@ -124,6 +129,120 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
         "Scheduled HACS refresh skipped because the HACS queue is already running"
         in caplog.text
     )
+
+
+async def test_scheduled_refresh_is_skipped_within_minimum_interval(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that scheduled refreshes respect the minimum interval."""
+    hacs.repositories.list_downloaded = []
+    hass.data["hacs"] = hacs
+
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    start = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=timezone.utc,
+    )
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: start,
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: start + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    assert runtime._last_refresh_started == start
+
+
+async def test_scheduled_refresh_is_allowed_at_minimum_interval(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that the minimum interval is inclusive."""
+    hacs.repositories.list_downloaded = []
+    hass.data["hacs"] = hacs
+
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    start = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=timezone.utc,
+    )
+
+    now = start
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: now,
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    now = start + MIN_REFRESH_INTERVAL
+
+    await runtime.async_refresh(source="scheduled")
+
+    assert runtime._last_refresh_started == now
+
+
+async def test_manual_refresh_bypasses_minimum_interval(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that manual refreshes bypass the minimum interval."""
+    hacs.repositories.list_downloaded = []
+    hass.data["hacs"] = hacs
+
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    start = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=timezone.utc,
+    )
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: start,
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    manual_time = start + timedelta(minutes=1)
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: manual_time,
+    )
+
+    await runtime.async_refresh(source="manual")
+
+    assert runtime._last_refresh_started == manual_time
 
 
 async def test_refresh_succeeds_with_no_repositories(

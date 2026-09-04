@@ -20,7 +20,8 @@
       "invalid_time": "Enter valid times using HH:MM format.",
       "no_times": "At least one refresh time is required.",
       "no_days": "Select at least one day.",
-      "too_many_times": "A maximum of 10 refresh times can be configured."
+      "too_many_times": "A maximum of 10 refresh times can be configured.",
+      "times_too_close": "Refresh times must be at least 10 minutes apart."
     }
   },
   "options": {
@@ -44,7 +45,8 @@
       "invalid_time": "Enter valid times using HH:MM format.",
       "no_times": "At least one refresh time is required.",
       "no_days": "Select at least one day.",
-      "too_many_times": "A maximum of 10 refresh times can be configured."
+      "too_many_times": "A maximum of 10 refresh times can be configured.",
+      "times_too_close": "Refresh times must be at least 10 minutes apart."
     }
   },
   "selector": {
