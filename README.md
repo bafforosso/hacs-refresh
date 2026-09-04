@@ -12,6 +12,8 @@ A Home Assistant custom integration that lets you manually or automatically refr
 
 - 🔄 **Manual refresh** — refresh all installed HACS repositories with a single action.
 - 🕐 **Automatic refresh** — schedule refreshes for selected days and times.
+- 🛡️ **Refresh protection** — prevent scheduled refreshes from running too frequently.
+- 💾 **Persistent state** — retain refresh information across Home Assistant restarts.
 - 📊 **Status sensor** — see the current refresh status, last refresh result, repository counts, errors, and next scheduled refresh.
 - ⚙️ **Configurable** — enable or disable automatic refresh and customize its schedule.
 
@@ -71,7 +73,9 @@ For example:
 
 `03:00, 15:00`
 
-The configured schedule applies only to automatic refreshes. Manual refreshes are always available, regardless of whether automatic refresh is enabled.
+The configured schedule applies only to automatic refreshes. Manual refreshes can also be triggered regardless of whether automatic refresh is enabled.
+
+Refresh state is persisted across Home Assistant restarts, so the integration retains information about the most recent refresh.
 
 ## Action
 
@@ -97,7 +101,7 @@ The sensor's **attributes** provide details about the most recent refresh and th
 | Attribute | Description |
 | --- | --- |
 | `last_result` | Result of the most recent refresh: `success`, `partial`, or `failed`. |
-| `last_refresh` | Date and time of the most recent refresh. |
+| `last_refresh` | Date and time of the most recent refresh. This value is persisted across Home Assistant restarts. |
 | `last_source` | What triggered the refresh, such as `manual` or `scheduled`. |
 | `repositories` | Number of installed HACS repositories included in the refresh. |
 | `successful` | Number of repositories refreshed successfully. |
