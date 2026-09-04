@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,8 +20,13 @@ def hacs() -> MagicMock:
         queued_tasks.append(task)
 
     async def process_queue():
-        for task in queued_tasks:
-            await task
+        results = await asyncio.gather(
+            *queued_tasks,
+            return_exceptions=True,
+        )
+        queued_tasks.clear()
+        hacs.queue.pending_tasks = 0
+        return results
 
     hacs.queue.add = MagicMock(side_effect=add_to_queue)
     hacs.async_process_queue = AsyncMock(side_effect=process_queue)

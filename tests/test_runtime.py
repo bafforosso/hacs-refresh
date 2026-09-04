@@ -157,42 +157,50 @@ async def test_refresh_reports_repository_failure(
     hass: HomeAssistant,
     hacs: MagicMock,
 ) -> None:
-    """Test that a repository refresh failure is reported correctly."""
+    """Test that repository refresh failures are reported correctly."""
     entry = MockConfigEntry(domain=DOMAIN)
 
-    repository = MagicMock()
-    repository.update_repository = AsyncMock(
+    successful_repository = MagicMock()
+    successful_repository.update_repository = AsyncMock()
+
+    failed_repository = MagicMock()
+    failed_repository.update_repository = AsyncMock(
         side_effect=RuntimeError("Something went wrong")
     )
+    failed_repository.data.full_name = "example/failed-repository"
 
-    repository.data.full_name = "example/repository"
-
-    hacs.repositories.list_downloaded = [repository]
+    hacs.repositories.list_downloaded = [
+        successful_repository,
+        failed_repository,
+    ]
     hass.data["hacs"] = hacs
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     with pytest.raises(
         HomeAssistantError,
-        match="Unexpected error while refreshing HACS repositories",
-    ) as exc_info:
+        match="1 of 2 HACS repository refreshes failed",
+    ):
         await runtime.async_refresh(source="manual")
 
-    assert isinstance(exc_info.value.__cause__, RuntimeError)
-    assert str(exc_info.value.__cause__) == "Something went wrong"
-
-    assert runtime.state == "idle"
-    assert runtime.last_result == "failed"
-    assert runtime.last_repositories == 1
-    assert runtime.last_successful == 0
-    assert runtime.last_failed == 0
-    assert runtime.last_pending == 1
-    assert runtime.last_error == "Something went wrong"
-
-    repository.update_repository.assert_awaited_once_with(
+    successful_repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
         force=True,
     )
-    hacs.queue.add.assert_called_once()
+    failed_repository.update_repository.assert_awaited_once_with(
+        ignore_issues=True,
+        force=True,
+    )
+
+    assert runtime.state == "idle"
+    assert runtime.last_result == "failed"
+    assert runtime.last_repositories == 2
+    assert runtime.last_successful == 1
+    assert runtime.last_failed == 1
+    assert runtime.last_pending == 0
+    assert runtime.last_error == "1 repository refresh task(s) failed"
+
+    hacs.queue.add.assert_called()
+    assert hacs.queue.add.call_count == 2
     hacs.async_process_queue.assert_awaited_once()
     hacs.data.async_write.assert_awaited_once()
