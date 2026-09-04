@@ -1,7 +1,7 @@
 {
   "domain": "hacs_refresh",
   "name": "HACS Refresh",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "documentation": "https://github.com/bafforosso/hacs-refresh",
   "issue_tracker": "https://github.com/bafforosso/hacs-refresh/issues",
   "codeowners": [
