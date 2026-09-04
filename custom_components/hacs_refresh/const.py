@@ -11,6 +11,8 @@ CONF_TIMES = "times"
 
 MIN_REFRESH_INTERVAL = timedelta(minutes=10)
 
+STORAGE_VERSION = 1
+
 WEEKDAYS = (
     "mon",
     "tue",
