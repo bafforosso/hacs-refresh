@@ -75,7 +75,9 @@ class HacsRefreshRuntimeData:
 
         last_refresh = data.get("last_refresh")
         if last_refresh is not None:
-            self.last_refresh = dt_util.parse_datetime(last_refresh)
+            parsed_last_refresh = dt_util.parse_datetime(last_refresh)
+            if parsed_last_refresh is not None:
+                self.last_refresh = parsed_last_refresh
 
         self.last_result = data.get("last_result")
         self.last_source = data.get("last_source")
