@@ -19,9 +19,7 @@ async def async_setup_entry(
     """Set up the HACS Refresh button."""
     runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-    async_add_entities(
-        [HacsRefreshButton(runtime)]
-    )
+    async_add_entities([HacsRefreshButton(runtime)])
 
 
 class HacsRefreshButton(
@@ -35,6 +33,4 @@ class HacsRefreshButton(
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.runtime.async_refresh(
-            source="manual"
-        )
+        await self.runtime.async_refresh(source="manual")

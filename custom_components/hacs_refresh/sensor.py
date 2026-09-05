@@ -16,7 +16,6 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
-    DOMAIN,
     WEEKDAYS,
 )
 from .entity import HacsRefreshEntity
@@ -29,13 +28,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HACS Refresh sensor."""
-    runtime: HacsRefreshRuntimeData = (
-        entry.runtime_data
-    )
+    runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-    async_add_entities(
-        [HacsRefreshStatusSensor(runtime)]
-    )
+    async_add_entities([HacsRefreshStatusSensor(runtime)])
 
 
 class HacsRefreshStatusSensor(
@@ -56,9 +51,7 @@ class HacsRefreshStatusSensor(
         """Initialize the sensor."""
         super().__init__(runtime)
 
-        self._remove_listener = runtime.add_listener(
-            self._async_runtime_updated
-        )
+        self._remove_listener = runtime.add_listener(self._async_runtime_updated)
 
     @property
     def native_value(self) -> str:
@@ -133,23 +126,15 @@ class HacsRefreshStatusSensor(
         candidates: list[datetime] = []
 
         for day_offset in range(8):
-            candidate_date = (
-                now.date()
-                + timedelta(days=day_offset)
-            )
+            candidate_date = now.date() + timedelta(days=day_offset)
 
-            weekday = WEEKDAYS[
-                candidate_date.weekday()
-            ]
+            weekday = WEEKDAYS[candidate_date.weekday()]
 
             if weekday not in days:
                 continue
 
             for time_string in times:
-                hour, minute = (
-                    int(value)
-                    for value in time_string.split(":")
-                )
+                hour, minute = (int(value) for value in time_string.split(":"))
 
                 candidate = datetime(
                     candidate_date.year,

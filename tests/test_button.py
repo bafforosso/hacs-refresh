@@ -25,6 +25,4 @@ async def test_refresh_button_triggers_manual_refresh() -> None:
 
     await button.async_press()
 
-    runtime.async_refresh.assert_awaited_once_with(
-        source="manual"
-    )
+    runtime.async_refresh.assert_awaited_once_with(source="manual")

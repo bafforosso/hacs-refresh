@@ -1,14 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
 )
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh import (
@@ -58,9 +56,7 @@ async def test_refresh_service_triggers_manual_refresh(
     config_entry = MagicMock()
     config_entry.runtime_data = runtime
 
-    hass.config_entries.async_loaded_entries = MagicMock(
-        return_value=[config_entry]
-    )
+    hass.config_entries.async_loaded_entries = MagicMock(return_value=[config_entry])
 
     await hass.services.async_call(
         DOMAIN,
@@ -139,9 +135,7 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
     )
 
     with (
-        patch(
-            "custom_components.hacs_refresh.HacsRefreshScheduler"
-        ) as scheduler_class,
+        patch("custom_components.hacs_refresh.HacsRefreshScheduler") as scheduler_class,
         patch.object(
             config_entry,
             "add_update_listener",
@@ -212,7 +206,7 @@ async def test_setup_entry_restores_persisted_refresh_data(
         12,
         34,
         56,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
     assert runtime.last_result == "success"
     assert runtime.last_source == "scheduled"

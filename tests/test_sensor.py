@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from custom_components.hacs_refresh.const import (
@@ -25,9 +25,7 @@ def test_status_sensor_initializes() -> None:
     assert sensor.unique_id == "hacs_refresh_status"
     assert sensor._attr_translation_key == "status"
     assert sensor._remove_listener is remove_listener
-    runtime.add_listener.assert_called_once_with(
-        sensor._async_runtime_updated
-    )
+    runtime.add_listener.assert_called_once_with(sensor._async_runtime_updated)
 
 
 def test_status_sensor_extra_state_attributes(freezer) -> None:
@@ -38,7 +36,7 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
 
     runtime.state = "idle"
     runtime.last_result = "success"
-    runtime.last_refresh = datetime(2026, 9, 4, 2, 30, tzinfo=timezone.utc)
+    runtime.last_refresh = datetime(2026, 9, 4, 2, 30, tzinfo=UTC)
     runtime.last_source = "scheduled"
     runtime.last_error = None
     runtime.last_repositories = 5

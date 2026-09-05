@@ -18,9 +18,7 @@ from .scheduler import HacsRefreshScheduler
 
 PLATFORMS = ["button", "sensor"]
 
-type HacsRefreshConfigEntry = ConfigEntry[
-    HacsRefreshRuntimeData
-]
+type HacsRefreshConfigEntry = ConfigEntry[HacsRefreshRuntimeData]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -35,24 +33,16 @@ async def async_setup(
         call: ServiceCall,
     ) -> None:
         """Force-refresh all installed HACS repositories."""
-        entries = hass.config_entries.async_loaded_entries(
-            DOMAIN
-        )
+        entries = hass.config_entries.async_loaded_entries(DOMAIN)
 
         if not entries:
-            raise ServiceValidationError(
-                "HACS Refresh is not configured or loaded"
-            )
+            raise ServiceValidationError("HACS Refresh is not configured or loaded")
 
         entry = entries[0]
 
-        runtime: HacsRefreshRuntimeData = (
-            entry.runtime_data
-        )
+        runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-        await runtime.async_refresh(
-            source="manual"
-        )
+        await runtime.async_refresh(source="manual")
 
     hass.services.async_register(
         DOMAIN,
@@ -69,9 +59,7 @@ async def async_setup_entry(
 ) -> bool:
     """Set up HACS Refresh from a config entry."""
     if hass.data.get("hacs") is None:
-        raise ConfigEntryNotReady(
-            "HACS is not available yet"
-        )
+        raise ConfigEntryNotReady("HACS is not available yet")
 
     runtime = HacsRefreshRuntimeData(
         hass,
@@ -87,9 +75,7 @@ async def async_setup_entry(
         runtime,
     )
 
-    entry.async_on_unload(
-        scheduler.async_unload
-    )
+    entry.async_on_unload(scheduler.async_unload)
 
     async def _async_options_updated(
         hass: HomeAssistant,
@@ -99,11 +85,7 @@ async def async_setup_entry(
         await scheduler.async_setup()
         runtime.notify_listeners()
 
-    entry.async_on_unload(
-        entry.add_update_listener(
-            _async_options_updated
-        )
-    )
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     await scheduler.async_setup()
 
