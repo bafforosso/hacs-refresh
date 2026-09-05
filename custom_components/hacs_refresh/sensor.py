@@ -8,10 +8,6 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import (
-    DeviceEntryType,
-    DeviceInfo,
-)
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -23,6 +19,7 @@ from .const import (
     DOMAIN,
     WEEKDAYS,
 )
+from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
 
 
@@ -41,10 +38,12 @@ async def async_setup_entry(
     )
 
 
-class HacsRefreshStatusSensor(SensorEntity):
+class HacsRefreshStatusSensor(
+    HacsRefreshEntity,
+    SensorEntity,
+):
     """Represent HACS Refresh status."""
 
-    _attr_has_entity_name = True
     _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
@@ -55,18 +54,10 @@ class HacsRefreshStatusSensor(SensorEntity):
         runtime: HacsRefreshRuntimeData,
     ) -> None:
         """Initialize the sensor."""
-        self.runtime = runtime
+        super().__init__(runtime)
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, runtime.entry.entry_id)},
-            translation_key="hacs_refresh",
-            entry_type=DeviceEntryType.SERVICE,
-        )
-
-        self._remove_listener = (
-            runtime.add_listener(
-                self._async_runtime_updated
-            )
+        self._remove_listener = runtime.add_listener(
+            self._async_runtime_updated
         )
 
     @property

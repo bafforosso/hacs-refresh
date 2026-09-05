@@ -16,7 +16,7 @@ from .const import DOMAIN, SERVICE_REFRESH
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["button", "sensor"]
 
 type HacsRefreshConfigEntry = ConfigEntry[
     HacsRefreshRuntimeData
