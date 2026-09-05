@@ -10,6 +10,7 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
 )
+from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN, SERVICE_REFRESH
 from .runtime import HacsRefreshRuntimeData
@@ -20,6 +21,8 @@ PLATFORMS = ["sensor"]
 type HacsRefreshConfigEntry = ConfigEntry[
     HacsRefreshRuntimeData
 ]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(
