@@ -109,7 +109,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
         "async_create_task",
     ) as create_task_mock:
         scheduler._handle_scheduled_time(
-            datetime(2026, 8, 31, 3, 0)
+            datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
         )
 
         create_task_mock.assert_called_once()
@@ -117,9 +117,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
         refresh_coroutine = create_task_mock.call_args.args[0]
         await refresh_coroutine
 
-    runtime.async_refresh.assert_awaited_once_with(
-        source="scheduled"
-    )
+    runtime.async_refresh.assert_awaited_once_with(source="scheduled")
 
 
 async def test_scheduler_skips_non_configured_day(
@@ -146,7 +144,7 @@ async def test_scheduler_skips_non_configured_day(
     ) as create_task_mock:
         # Tuesday — Monday is the only configured day.
         scheduler._handle_scheduled_time(
-            datetime(2026, 9, 1, 3, 0)
+            datetime(2026, 9, 1, 3, 0),  # noqa: DTZ001
         )
 
     create_task_mock.assert_not_called()
@@ -181,7 +179,7 @@ async def test_scheduler_skips_when_refresh_is_in_progress(
             "async_create_task",
         ) as create_task_mock:
             scheduler._handle_scheduled_time(
-                datetime(2026, 8, 31, 3, 0)
+                datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
             )
 
         create_task_mock.assert_not_called()

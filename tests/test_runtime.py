@@ -1,11 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
@@ -162,7 +160,7 @@ async def test_scheduled_refresh_is_skipped_within_minimum_interval(
         1,
         2,
         30,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
     monkeypatch.setattr(
@@ -200,7 +198,7 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
         1,
         2,
         30,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
     now = start
@@ -237,7 +235,7 @@ async def test_manual_refresh_bypasses_minimum_interval(
         1,
         2,
         30,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
     monkeypatch.setattr(
@@ -399,7 +397,7 @@ async def test_runtime_loads_persisted_refresh_data(
         12,
         34,
         56,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
     assert restored_runtime.last_result == "success"
     assert restored_runtime.last_source == "scheduled"
@@ -407,6 +405,4 @@ async def test_runtime_loads_persisted_refresh_data(
     assert restored_runtime.last_successful == 9
     assert restored_runtime.last_failed == 1
     assert restored_runtime.last_pending == 0
-    assert restored_runtime.last_error == (
-        "1 repository refresh task failed"
-    )
+    assert restored_runtime.last_error == ("1 repository refresh task failed")

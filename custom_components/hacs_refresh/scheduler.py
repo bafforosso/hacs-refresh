@@ -32,9 +32,7 @@ class HacsRefreshScheduler:
         self.hass = hass
         self.runtime = runtime
 
-        self._unsubscribers: list[
-            Callable[[], None]
-        ] = []
+        self._unsubscribers: list[Callable[[], None]] = []
 
     async def async_setup(self) -> None:
         """Set up the configured schedule."""
@@ -46,19 +44,14 @@ class HacsRefreshScheduler:
             CONF_AUTOMATIC_REFRESH,
             False,
         ):
-            _LOGGER.debug(
-                "Automatic HACS refresh is disabled"
-            )
+            _LOGGER.debug("Automatic HACS refresh is disabled")
             return
 
         for time_string in options.get(
             CONF_TIMES,
             [],
         ):
-            hour, minute = (
-                int(value)
-                for value in time_string.split(":")
-            )
+            hour, minute = (int(value) for value in time_string.split(":"))
 
             self._unsubscribers.append(
                 async_track_time_change(
@@ -114,8 +107,4 @@ class HacsRefreshScheduler:
             )
             return
 
-        self.hass.async_create_task(
-            self.runtime.async_refresh(
-                source="scheduled"
-            )
-        )
+        self.hass.async_create_task(self.runtime.async_refresh(source="scheduled"))

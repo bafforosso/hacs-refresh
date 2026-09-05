@@ -1,0 +1,14 @@
+{
+  "entity": {
+    "button": {
+      "refresh": {
+        "default": "mdi:refresh"
+      }
+    },
+    "sensor": {
+      "status": {
+        "default": "mdi:refresh-circle"
+      }
+    }
+  }
+}

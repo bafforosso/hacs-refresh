@@ -1,16 +1,17 @@
 {
   "domain": "hacs_refresh",
   "name": "HACS Refresh",
-  "version": "0.3.0",
-  "documentation": "https://github.com/bafforosso/hacs-refresh",
-  "issue_tracker": "https://github.com/bafforosso/hacs-refresh/issues",
   "codeowners": [
     "@bafforosso"
   ],
   "config_flow": true,
-  "single_config_entry": true,
   "dependencies": [
     "hacs"
   ],
-  "integration_type": "service"
+  "documentation": "https://github.com/bafforosso/hacs-refresh",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/bafforosso/hacs-refresh/issues",
+  "single_config_entry": true,
+  "version": "0.4.0"
 }

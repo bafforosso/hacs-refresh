@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from homeassistant.helpers.schema_config_entry_flow import SchemaFlowError
 
 from custom_components.hacs_refresh.config_flow import (
@@ -19,15 +18,12 @@ from custom_components.hacs_refresh.const import (
     DEFAULT_DAYS,
     DEFAULT_TIMES,
     MAX_TIMES,
-    MIN_REFRESH_INTERVAL,
 )
 
 
 def test_parse_times_normalizes_and_sorts() -> None:
     """Test that times are normalized, sorted, and deduplicated."""
-    assert _parse_times(
-        "15:30, 03:00, 15:30, 9:05"
-    ) == [
+    assert _parse_times("15:30, 03:00, 15:30, 9:05") == [
         "03:00",
         "09:05",
         "15:30",
@@ -52,9 +48,7 @@ def test_parse_times_rejects_invalid_times(value: str) -> None:
 
 def test_sort_days_returns_monday_to_sunday_order() -> None:
     """Test that selected weekdays are returned in calendar order."""
-    assert _sort_days(
-        ["sun", "wed", "mon", "sat"]
-    ) == [
+    assert _sort_days(["sun", "wed", "mon", "sat"]) == [
         "mon",
         "wed",
         "sat",
@@ -153,10 +147,7 @@ async def test_validate_options_rejects_too_many_times() -> None:
     handler = MagicMock()
     handler.options = {}
 
-    times = ", ".join(
-        f"{hour:02d}:00"
-        for hour in range(MAX_TIMES + 1)
-    )
+    times = ", ".join(f"{hour:02d}:00" for hour in range(MAX_TIMES + 1))
 
     user_input = {
         CONF_AUTOMATIC_REFRESH: True,

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
+from itertools import pairwise
 from typing import Any, override
 
 import voluptuous as vol
-
 from homeassistant.helpers import selector
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaCommonFlowHandler,
@@ -81,9 +81,7 @@ async def _suggested_values(
     suggested = dict(options)
 
     if CONF_TIMES in suggested:
-        suggested[CONF_TIMES] = ", ".join(
-            suggested[CONF_TIMES]
-        )
+        suggested[CONF_TIMES] = ", ".join(suggested[CONF_TIMES])
 
     return suggested
 
@@ -99,9 +97,7 @@ async def _validate_options(
         raise SchemaFlowError("no_days")
 
     try:
-        times = _parse_times(
-            user_input[CONF_TIMES]
-        )
+        times = _parse_times(user_input[CONF_TIMES])
     except ValueError as err:
         raise SchemaFlowError("invalid_time") from err
 
@@ -117,9 +113,7 @@ async def _validate_options(
         raise SchemaFlowError("times_too_close") from err
 
     return {
-        CONF_AUTOMATIC_REFRESH: user_input[
-            CONF_AUTOMATIC_REFRESH
-        ],
+        CONF_AUTOMATIC_REFRESH: user_input[CONF_AUTOMATIC_REFRESH],
         CONF_DAYS: _sort_days(days),
         CONF_TIMES: times,
     }
@@ -131,11 +125,7 @@ def _sort_days(
     """Return weekdays in Monday-to-Sunday order."""
     selected_days = set(days)
 
-    return [
-        day
-        for day in WEEKDAYS
-        if day in selected_days
-    ]
+    return [day for day in WEEKDAYS if day in selected_days]
 
 
 def _parse_times(
@@ -143,7 +133,7 @@ def _parse_times(
 ) -> list[str]:
     """Parse and normalize comma-separated HH:MM times."""
     if not isinstance(value, str):
-        raise ValueError
+        raise TypeError
 
     result: set[str] = set()
 
@@ -153,14 +143,12 @@ def _parse_times(
         if not item:
             continue
 
-        parsed = datetime.strptime(
+        parsed = datetime.strptime(  # noqa: DTZ007
             item,
             "%H:%M",
         )
 
-        result.add(
-            parsed.strftime("%H:%M")
-        )
+        result.add(parsed.strftime("%H:%M"))
 
     return sorted(result)
 
@@ -172,15 +160,12 @@ def _validate_refresh_intervals(times: list[str]) -> None:
 
     minutes = sorted(
         int(hour) * 60 + int(minute)
-        for hour, minute in (
-            time_string.split(":")
-            for time_string in times
-        )
+        for hour, minute in (time_string.split(":") for time_string in times)
     )
 
     minimum_minutes = int(MIN_REFRESH_INTERVAL.total_seconds() // 60)
 
-    for current, following in zip(minutes, minutes[1:]):
+    for current, following in pairwise(minutes):
         if following - current < minimum_minutes:
             raise ValueError
 

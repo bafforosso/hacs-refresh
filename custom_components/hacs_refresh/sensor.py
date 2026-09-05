@@ -8,10 +8,6 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import (
-    DeviceEntryType,
-    DeviceInfo,
-)
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -20,9 +16,9 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
-    DOMAIN,
     WEEKDAYS,
 )
+from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
 
 
@@ -32,19 +28,17 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HACS Refresh sensor."""
-    runtime: HacsRefreshRuntimeData = (
-        entry.runtime_data
-    )
+    runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-    async_add_entities(
-        [HacsRefreshStatusSensor(runtime)]
-    )
+    async_add_entities([HacsRefreshStatusSensor(runtime)])
 
 
-class HacsRefreshStatusSensor(SensorEntity):
+class HacsRefreshStatusSensor(
+    HacsRefreshEntity,
+    SensorEntity,
+):
     """Represent HACS Refresh status."""
 
-    _attr_has_entity_name = True
     _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
@@ -55,19 +49,9 @@ class HacsRefreshStatusSensor(SensorEntity):
         runtime: HacsRefreshRuntimeData,
     ) -> None:
         """Initialize the sensor."""
-        self.runtime = runtime
+        super().__init__(runtime)
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, runtime.entry.entry_id)},
-            translation_key="hacs_refresh",
-            entry_type=DeviceEntryType.SERVICE,
-        )
-
-        self._remove_listener = (
-            runtime.add_listener(
-                self._async_runtime_updated
-            )
-        )
+        self._remove_listener = runtime.add_listener(self._async_runtime_updated)
 
     @property
     def native_value(self) -> str:
@@ -142,23 +126,15 @@ class HacsRefreshStatusSensor(SensorEntity):
         candidates: list[datetime] = []
 
         for day_offset in range(8):
-            candidate_date = (
-                now.date()
-                + timedelta(days=day_offset)
-            )
+            candidate_date = now.date() + timedelta(days=day_offset)
 
-            weekday = WEEKDAYS[
-                candidate_date.weekday()
-            ]
+            weekday = WEEKDAYS[candidate_date.weekday()]
 
             if weekday not in days:
                 continue
 
             for time_string in times:
-                hour, minute = (
-                    int(value)
-                    for value in time_string.split(":")
-                )
+                hour, minute = (int(value) for value in time_string.split(":"))
 
                 candidate = datetime(
                     candidate_date.year,
