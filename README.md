@@ -2,9 +2,9 @@
 
 [![Made for Home Assistant](https://img.shields.io/badge/Made_for-Homeassistant-blue?style=flat&logo=homeassistant&logoColor=FFFFFF)](https://www.home-assistant.io/)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange?style=flat&logo=homeassistantcommunitystore&logoColor=FFFFFF)](https://hacs.xyz/)
-![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bafforosso/hacs-refresh/tests.yml?style=flat&label=Tests)](https://github.com/bafforosso/hacs-refresh/actions/workflows/tests.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
-![GitHub Downloads](https://img.shields.io/github/downloads/bafforosso/hacs-refresh/total?style=flat)
+![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
 
 A Home Assistant custom integration that lets you manually or automatically refresh the metadata of all installed HACS repositories.
 
