@@ -10,7 +10,7 @@ A Home Assistant custom integration that lets you manually or automatically refr
 
 ## Features
 
-- 🔄 **Manual refresh** — refresh all installed HACS repositories with a single action.
+- 🔄 **Manual refresh** — refresh all installed HACS repositories from the **Refresh** button or action.
 - 🕐 **Automatic refresh** — schedule refreshes for selected days and times.
 - 🛡️ **Refresh protection** — prevent scheduled refreshes from running too frequently.
 - 💾 **Persistent state** — retain refresh information across Home Assistant restarts.
@@ -77,13 +77,11 @@ The configured schedule applies only to automatic refreshes. Manual refreshes ca
 
 Refresh state is persisted across Home Assistant restarts, so the integration retains information about the most recent refresh.
 
-## Action
+## Manual Refresh
 
-The integration provides the following action:
+A manual refresh can be triggered using the **Refresh** button.
 
-`hacs_refresh.refresh`
-
-Calling this action forces a metadata refresh of all installed HACS repositories.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions.
 
 ## Status Sensor
 
