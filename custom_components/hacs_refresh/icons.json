@@ -5,6 +5,11 @@
         "default": "mdi:refresh"
       }
     },
+    "event": {
+      "refresh_completed": {
+        "default": "mdi:refresh-circle"
+      }
+    },
     "sensor": {
       "status": {
         "default": "mdi:refresh-circle"

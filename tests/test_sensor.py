@@ -5,6 +5,7 @@ from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    EVENT_TYPE_SUCCESS,
 )
 from custom_components.hacs_refresh.sensor import HacsRefreshStatusSensor
 
@@ -35,7 +36,7 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
     runtime = MagicMock()
 
     runtime.state = "idle"
-    runtime.last_result = "success"
+    runtime.last_result = EVENT_TYPE_SUCCESS
     runtime.last_refresh = datetime(2026, 9, 4, 2, 30, tzinfo=UTC)
     runtime.last_source = "scheduled"
     runtime.last_error = None

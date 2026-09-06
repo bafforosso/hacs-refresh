@@ -24,6 +24,55 @@
       "times_too_close": "Refresh times must be at least 10 minutes apart."
     }
   },
+  "device": {
+    "hacs_refresh": {
+      "name": "HACS Refresh"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "event": {
+      "refresh_completed": {
+        "name": "Refresh completed"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "refreshing": "Refreshing"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "refresh_in_progress": {
+      "message": "A HACS refresh is already in progress."
+    },
+    "hacs_unavailable": {
+      "message": "HACS is not available."
+    },
+    "hacs_disabled": {
+      "message": "HACS is disabled."
+    },
+    "hacs_queue_running": {
+      "message": "The HACS queue is already running."
+    },
+    "unexpected_refresh_error": {
+      "message": "Unexpected error while refreshing HACS repositories."
+    },
+    "refresh_tasks_pending": {
+      "message": "{pending} HACS refresh task(s) remain pending."
+    },
+    "refresh_tasks_failed": {
+      "message": "{failed} of {repositories} HACS repository refreshes failed."
+    }
+  },
   "options": {
     "step": {
       "init": {
@@ -62,21 +111,10 @@
       }
     }
   },
-  "entity": {
-    "button": {
-      "refresh": {
-        "name": "Refresh"
-      }
-    },
-    "sensor": {
-      "status": {
-        "name": "Status"
-      }
-    }
-  },
-  "device": {
-    "hacs_refresh": {
-      "name": "HACS Refresh"
+  "services": {
+    "refresh": {
+      "name": "Refresh HACS repositories",
+      "description": "Force-refresh all installed HACS repositories."
     }
   }
 }

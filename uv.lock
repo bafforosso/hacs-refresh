@@ -2232,7 +2232,7 @@ wheels = [
 
 [[package]]
 name = "hacs-refresh"
-version = "0.4.0"
+version = "0.5.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
