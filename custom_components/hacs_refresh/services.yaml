@@ -1,3 +1,1 @@
 refresh:
-  name: Refresh HACS repositories
-  description: Force-refresh all installed HACS repositories.

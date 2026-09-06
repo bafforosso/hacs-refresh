@@ -24,6 +24,32 @@
       "times_too_close": "Refresh times must be at least 10 minutes apart."
     }
   },
+  "device": {
+    "hacs_refresh": {
+      "name": "HACS Refresh"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "event": {
+      "refresh_completed": {
+        "name": "Refresh completed"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "refreshing": "Refreshing"
+        }
+      }
+    }
+  },
   "options": {
     "step": {
       "init": {
@@ -62,26 +88,10 @@
       }
     }
   },
-  "entity": {
-    "button": {
-      "refresh": {
-        "name": "Refresh"
-      }
-    },
-    "event": {
-      "refresh_completed": {
-        "name": "Refresh completed"
-      }
-    },
-    "sensor": {
-      "status": {
-        "name": "Status"
-      }
-    }
-  },
-  "device": {
-    "hacs_refresh": {
-      "name": "HACS Refresh"
+  "services": {
+    "refresh": {
+      "name": "Refresh HACS repositories",
+      "description": "Force-refresh all installed HACS repositories."
     }
   }
 }
