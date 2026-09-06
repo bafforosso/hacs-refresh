@@ -10,13 +10,13 @@ A Home Assistant custom integration that lets you manually or automatically refr
 
 ## Features
 
-- 🔄 **Manual refresh** — refresh all installed HACS repositories from the **Refresh** button or action.
-- 🕐 **Automatic refresh** — schedule refreshes for selected days and times.
-- 🛡️ **Refresh protection** — prevent scheduled refreshes from running too frequently.
-- 💾 **Persistent state** — retain refresh information across Home Assistant restarts.
-- 📊 **Status sensor** — see the current refresh status, last refresh result, repository counts, errors, and next scheduled refresh.
-- 🔔 Refresh completed event — trigger automations when a refresh finishes.
-- ⚙️ **Configurable** — enable or disable automatic refresh and customize its schedule.
+- **Manual refresh** — refresh all installed HACS repositories from the **Refresh** button or action.
+- **Automatic refresh** — schedule refreshes for selected days and times.
+- **Refresh protection** — prevent scheduled refreshes from running too frequently.
+- **Persistent state** — retain refresh information across Home Assistant restarts.
+- **Status sensor** — see the current refresh status, last refresh result, repository counts, errors, and next scheduled refresh.
+- **Refresh completed event** — trigger automations when a refresh finishes.
+- **Configurable** — enable or disable automatic refresh and customize its schedule.
 
 ## Requirements
 
