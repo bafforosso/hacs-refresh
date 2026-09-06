@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
     EVENT_TYPE_FAILED,
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
@@ -183,7 +184,10 @@ class HacsRefreshRuntimeData:
                 )
                 return
 
-            raise HacsRefreshSkipped("A HACS refresh is already in progress")
+            raise HacsRefreshSkipped(
+                translation_domain=DOMAIN,
+                translation_key="refresh_in_progress",
+            )
 
         async with self._refresh_lock:
             try:
@@ -213,7 +217,8 @@ class HacsRefreshRuntimeData:
                     return
 
                 raise HomeAssistantError(
-                    "Unexpected error while refreshing HACS repositories"
+                    translation_domain=DOMAIN,
+                    translation_key="unexpected_refresh_error",
                 ) from err
 
     async def _async_do_refresh(
@@ -224,10 +229,16 @@ class HacsRefreshRuntimeData:
         """Perform a HACS refresh."""
         hacs = self.hass.data.get("hacs")
         if hacs is None:
-            raise HomeAssistantError("HACS is not available")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="hacs_unavailable",
+            )
 
         if hacs.system.disabled:
-            raise HomeAssistantError("HACS is disabled")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="hacs_disabled",
+            )
 
         if hacs.queue.running:
             if source == "scheduled":
@@ -237,7 +248,10 @@ class HacsRefreshRuntimeData:
                 )
                 return
 
-            raise HacsRefreshSkipped("The HACS queue is already running")
+            raise HacsRefreshSkipped(
+                translation_domain=DOMAIN,
+                translation_key="hacs_queue_running",
+            )
 
         now = dt_util.now()
         if (
@@ -348,7 +362,11 @@ class HacsRefreshRuntimeData:
                 pending,
             )
 
-            raise HomeAssistantError(f"{pending} HACS refresh task(s) remain pending")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="refresh_tasks_pending",
+                translation_placeholders={"pending": str(pending)},
+            )
 
         if failures:
             _LOGGER.error(
@@ -364,8 +382,12 @@ class HacsRefreshRuntimeData:
                 )
 
             raise HomeAssistantError(
-                f"{len(failures)} of {len(repositories)} "
-                "HACS repository refreshes failed"
+                translation_domain=DOMAIN,
+                translation_key="refresh_tasks_failed",
+                translation_placeholders={
+                    "failed": str(len(failures)),
+                    "repositories": str(len(repositories)),
+                },
             )
 
         _LOGGER.debug(

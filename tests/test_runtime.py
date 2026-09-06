@@ -25,11 +25,12 @@ async def test_refresh_fails_when_hacs_is_unavailable(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with pytest.raises(
-        HomeAssistantError,
-        match="HACS is not available",
-    ):
+    with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "hacs_unavailable"
+    assert exc_info.value.translation_placeholders is None
 
 
 async def test_refresh_succeeds(
@@ -92,11 +93,36 @@ async def test_refresh_fails_when_hacs_is_disabled(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with pytest.raises(
-        HomeAssistantError,
-        match="HACS is disabled",
-    ):
+    with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "hacs_disabled"
+    assert exc_info.value.translation_placeholders is None
+
+
+async def test_refresh_fails_on_unexpected_error(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that unexpected refresh errors are translated."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    unexpected_error = RuntimeError("Something went wrong")
+    monkeypatch.setattr(
+        runtime,
+        "_async_do_refresh",
+        AsyncMock(side_effect=unexpected_error),
+    )
+
+    with pytest.raises(HomeAssistantError) as exc_info:
+        await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "unexpected_refresh_error"
+    assert exc_info.value.translation_placeholders is None
+    assert exc_info.value.__cause__ is unexpected_error
 
 
 async def test_manual_refresh_is_skipped_when_queue_is_running(
@@ -111,13 +137,30 @@ async def test_manual_refresh_is_skipped_when_queue_is_running(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with pytest.raises(
-        HacsRefreshSkipped,
-        match="The HACS queue is already running",
-    ):
+    with pytest.raises(HacsRefreshSkipped) as exc_info:
         await runtime.async_refresh(source="manual")
 
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "hacs_queue_running"
+    assert exc_info.value.translation_placeholders is None
+
     hacs.async_process_queue.assert_not_awaited()
+
+
+async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a manual refresh is skipped when another refresh is in progress."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    async with runtime._refresh_lock:
+        with pytest.raises(HacsRefreshSkipped) as exc_info:
+            await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "refresh_in_progress"
+    assert exc_info.value.translation_placeholders is None
 
 
 async def test_scheduled_refresh_is_skipped_when_queue_is_running(
@@ -338,6 +381,56 @@ async def test_refresh_succeeds_with_no_repositories(
     hacs.data.async_write.assert_not_awaited()
 
 
+async def test_refresh_reports_pending_repositories(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that pending repository refreshes are reported correctly."""
+    entry = MockConfigEntry(domain=DOMAIN)
+
+    repository = MagicMock()
+    repository.update_repository = AsyncMock()
+
+    hacs.repositories.list_downloaded = [repository]
+
+    async def process_queue() -> None:
+        await hacs.queue.add.call_args.args[0]
+        hacs.queue.pending_tasks = 1
+
+    hacs.async_process_queue = AsyncMock(side_effect=process_queue)
+    hass.data["hacs"] = hacs
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    with pytest.raises(HomeAssistantError) as exc_info:
+        await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "refresh_tasks_pending"
+    assert exc_info.value.translation_placeholders == {
+        "pending": "1",
+    }
+
+    assert runtime.state == "idle"
+    assert runtime.last_result == "partial"
+    assert runtime.last_source == "manual"
+    assert runtime.last_repositories == 1
+    assert runtime.last_successful == 1
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 1
+    assert runtime.last_error == "1 repository refresh task(s) remain pending"
+
+    stored = await runtime._store.async_load()
+    assert stored is not None
+    assert stored["last_result"] == "partial"
+    assert stored["last_source"] == "manual"
+    assert stored["last_repositories"] == 1
+    assert stored["last_successful"] == 1
+    assert stored["last_failed"] == 0
+    assert stored["last_pending"] == 1
+    assert stored["last_error"] == "1 repository refresh task(s) remain pending"
+
+
 async def test_refresh_reports_repository_failure(
     hass: HomeAssistant,
     hacs: MagicMock,
@@ -363,11 +456,15 @@ async def test_refresh_reports_repository_failure(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with pytest.raises(
-        HomeAssistantError,
-        match="1 of 2 HACS repository refreshes failed",
-    ):
+    with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "refresh_tasks_failed"
+    assert exc_info.value.translation_placeholders == {
+        "failed": "1",
+        "repositories": "2",
+    }
 
     successful_repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
