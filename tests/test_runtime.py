@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     DOMAIN,
+    EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
 )
 from custom_components.hacs_refresh.runtime import (
@@ -177,7 +178,7 @@ async def test_scheduled_refresh_is_skipped_within_minimum_interval(
 
     await runtime.async_refresh(source="scheduled")
 
-    assert runtime._last_refresh_started == start
+    assert runtime.last_refresh == start
 
 
 async def test_scheduled_refresh_is_allowed_at_minimum_interval(
@@ -214,7 +215,7 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
 
     await runtime.async_refresh(source="scheduled")
 
-    assert runtime._last_refresh_started == now
+    assert runtime.last_refresh == now
 
 
 async def test_manual_refresh_bypasses_minimum_interval(
@@ -254,7 +255,48 @@ async def test_manual_refresh_bypasses_minimum_interval(
 
     await runtime.async_refresh(source="manual")
 
-    assert runtime._last_refresh_started == manual_time
+    assert runtime.last_refresh == manual_time
+
+
+async def test_scheduled_refresh_respects_minimum_interval_after_reload(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that the minimum interval survives a runtime reload."""
+    hacs.repositories.list_downloaded = []
+    hass.data["hacs"] = hacs
+
+    entry = MockConfigEntry(domain=DOMAIN)
+
+    last_refresh = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    runtime.last_refresh = last_refresh
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = "scheduled"
+    await runtime._async_save_last_refresh()
+
+    restored_runtime = HacsRefreshRuntimeData(hass, entry)
+    await restored_runtime.async_load()
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.dt_util.now",
+        lambda: last_refresh + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
+    )
+
+    await restored_runtime.async_refresh(source="scheduled")
+
+    assert restored_runtime.last_refresh == last_refresh
+    assert restored_runtime.state == "idle"
+    hacs.async_process_queue.assert_not_awaited()
 
 
 async def test_refresh_succeeds_with_no_repositories(

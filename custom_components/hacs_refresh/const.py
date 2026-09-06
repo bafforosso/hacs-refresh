@@ -5,6 +5,10 @@ from datetime import timedelta
 DOMAIN = "hacs_refresh"
 SERVICE_REFRESH = "refresh"
 
+EVENT_TYPE_SUCCESS = "success"
+EVENT_TYPE_PARTIAL = "partial"
+EVENT_TYPE_FAILED = "failed"
+
 CONF_AUTOMATIC_REFRESH = "automatic_refresh"
 CONF_DAYS = "days"
 CONF_TIMES = "times"

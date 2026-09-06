@@ -15,6 +15,7 @@ A Home Assistant custom integration that lets you manually or automatically refr
 - 🛡️ **Refresh protection** — prevent scheduled refreshes from running too frequently.
 - 💾 **Persistent state** — retain refresh information across Home Assistant restarts.
 - 📊 **Status sensor** — see the current refresh status, last refresh result, repository counts, errors, and next scheduled refresh.
+- 🔔 Refresh completed event — trigger automations when a refresh finishes.
 - ⚙️ **Configurable** — enable or disable automatic refresh and customize its schedule.
 
 ## Requirements
@@ -110,3 +111,28 @@ The sensor's **attributes** provide details about the most recent refresh and th
 | `schedule_days` | Days configured for automatic refreshes. |
 | `schedule_times` | Times configured for automatic refreshes. |
 | `next_refresh` | Date and time of the next scheduled automatic refresh, or `null` when automatic refresh is disabled. |
+
+## Refresh Completed Event
+
+The integration provides an event entity:
+
+`event.hacs_refresh_refresh_completed`
+
+The event fires whenever an actual refresh completes. The event type indicates the result:
+
+- `success` — all repositories refreshed successfully.
+- `partial` — one or more repositories remain pending.
+- `failed` — one or more repositories failed to refresh.
+
+The event data includes the refresh source and repository counts, for example:
+
+```yaml
+source: scheduled
+repositories: 47
+successful: 47
+failed: 0
+pending: 0
+last_error: null
+```
+
+The event type is available to automations as `success`, `partial`, or `failed`.

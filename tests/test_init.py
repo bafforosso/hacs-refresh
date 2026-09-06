@@ -18,6 +18,11 @@ from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
 from custom_components.hacs_refresh.runtime import HacsRefreshRuntimeData
 
 
+def test_platforms() -> None:
+    """Test the integration platforms."""
+    assert PLATFORMS == ["button", "event", "sensor"]
+
+
 async def test_service_is_registered(hass: HomeAssistant) -> None:
     """Test that the refresh service is registered."""
     assert not hass.services.has_service(DOMAIN, SERVICE_REFRESH)

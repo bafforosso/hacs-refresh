@@ -68,6 +68,11 @@
         "name": "Refresh"
       }
     },
+    "event": {
+      "refresh_completed": {
+        "name": "Refresh completed"
+      }
+    },
     "sensor": {
       "status": {
         "name": "Status"
