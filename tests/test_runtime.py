@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from homeassistant.const import Platform
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -400,6 +400,52 @@ async def test_scheduled_refresh_is_allowed_without_last_refresh_event(
 
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    await runtime.async_refresh(source="scheduled")
+
+    assert runtime.state == "idle"
+    assert runtime.last_result == EVENT_TYPE_SUCCESS
+    hacs.async_process_queue.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "event_state",
+    [
+        STATE_UNKNOWN,
+        STATE_UNAVAILABLE,
+        "not-a-timestamp",
+    ],
+)
+async def test_scheduled_refresh_is_allowed_without_valid_last_refresh_event(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+    event_state: str,
+) -> None:
+    """Test that scheduled refreshes are allowed without a valid completion event."""
+    repository = MagicMock()
+    repository.update_repository = AsyncMock()
+    hacs.repositories.list_downloaded = [repository]
+    hass.data["hacs"] = hacs
+
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    entity_registry = er.async_get(hass)
+    entity_registry.async_get_or_create(
+        Platform.EVENT,
+        DOMAIN,
+        EVENT_ENTITY_UNIQUE_ID,
+        suggested_object_id="hacs_refresh_refresh_completed",
+    )
+
+    event_entity_id = entity_registry.async_get_entity_id(
+        Platform.EVENT,
+        DOMAIN,
+        EVENT_ENTITY_UNIQUE_ID,
+    )
+    assert event_entity_id is not None
+
+    hass.states.async_set(event_entity_id, event_state)
 
     await runtime.async_refresh(source="scheduled")
 
