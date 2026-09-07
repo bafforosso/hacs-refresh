@@ -58,26 +58,6 @@ class HacsRefreshRuntimeData:
         self.last_failed = 0
         self.last_pending = 0
 
-    async def async_load(self) -> None:
-        """Load persisted refresh data."""
-        data = await self._store.async_load()
-        if data is None:
-            return
-
-        last_refresh = data.get("last_refresh")
-        if last_refresh is not None:
-            parsed_last_refresh = dt_util.parse_datetime(last_refresh)
-            if parsed_last_refresh is not None:
-                self.last_refresh = parsed_last_refresh
-
-        self.last_result = data.get("last_result")
-        self.last_source = data.get("last_source")
-        self.last_repositories = data.get("last_repositories", 0)
-        self.last_successful = data.get("last_successful", 0)
-        self.last_failed = data.get("last_failed", 0)
-        self.last_pending = data.get("last_pending", 0)
-        self.last_error = data.get("last_error")
-
     @property
     def options(self) -> dict[str, Any]:
         """Return the current integration options."""

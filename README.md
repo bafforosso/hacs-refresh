@@ -75,8 +75,6 @@ For example:
 
 The configured schedule applies only to automatic refreshes. Manual refreshes can also be triggered regardless of whether automatic refresh is enabled.
 
-Refresh state is persisted across Home Assistant restarts, so the integration retains information about the most recent refresh.
-
 ## Manual Refresh
 
 A manual refresh can be triggered using the **Refresh** button.
@@ -109,7 +107,7 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever an actual refresh completes. The event state contains the timestamp of the most recent completed refresh and the event type indicates the result:
+The event fires whenever an actual refresh attempt completes. The event state contains the timestamp of the most recent completed refresh and the event type indicates the result:
 
 - `success` — all repositories refreshed successfully.
 - `partial` — one or more repositories remain pending.
