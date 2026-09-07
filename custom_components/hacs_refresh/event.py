@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
+    EVENT_ENTITY_UNIQUE_ID,
     EVENT_TYPE_FAILED,
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
@@ -37,7 +38,7 @@ class HacsRefreshCompletedEvent(
 
     _attr_translation_key = "refresh_completed"
     _attr_should_poll = False
-    _attr_unique_id = "hacs_refresh_refresh_completed"
+    _attr_unique_id = EVENT_ENTITY_UNIQUE_ID
     _attr_event_types: ClassVar[list[str]] = [
         EVENT_TYPE_SUCCESS,
         EVENT_TYPE_PARTIAL,

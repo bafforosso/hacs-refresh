@@ -5,6 +5,8 @@ from datetime import timedelta
 DOMAIN = "hacs_refresh"
 SERVICE_REFRESH = "refresh"
 
+EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"
+
 EVENT_TYPE_SUCCESS = "success"
 EVENT_TYPE_PARTIAL = "partial"
 EVENT_TYPE_FAILED = "failed"
@@ -14,8 +16,6 @@ CONF_DAYS = "days"
 CONF_TIMES = "times"
 
 MIN_REFRESH_INTERVAL = timedelta(minutes=10)
-
-STORAGE_VERSION = 1
 
 WEEKDAYS = (
     "mon",

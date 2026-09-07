@@ -55,14 +55,6 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
     attributes = sensor.extra_state_attributes
 
     assert attributes == {
-        "last_result": "success",
-        "last_refresh": "2026-09-04T02:30:00+00:00",
-        "last_source": "scheduled",
-        "repositories": 5,
-        "successful": 5,
-        "failed": 0,
-        "pending": 0,
-        "last_error": None,
         "automatic_refresh": True,
         "schedule_days": ["mon", "wed", "fri"],
         "schedule_times": ["02:30", "14:00"],

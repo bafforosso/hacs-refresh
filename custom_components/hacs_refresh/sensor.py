@@ -79,18 +79,6 @@ class HacsRefreshStatusSensor(
                 [],
             ),
             "next_refresh": self._next_refresh(),
-            "last_refresh": (
-                self.runtime.last_refresh.isoformat()
-                if self.runtime.last_refresh
-                else None
-            ),
-            "last_result": self.runtime.last_result,
-            "last_source": self.runtime.last_source,
-            "repositories": self.runtime.last_repositories,
-            "successful": self.runtime.last_successful,
-            "failed": self.runtime.last_failed,
-            "pending": self.runtime.last_pending,
-            "last_error": self.runtime.last_error,
         }
 
     @callback

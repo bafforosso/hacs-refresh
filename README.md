@@ -13,8 +13,7 @@ A Home Assistant custom integration that lets you manually or automatically refr
 - **Manual refresh** — refresh all installed HACS repositories from the **Refresh** button or action.
 - **Automatic refresh** — schedule refreshes for selected days and times.
 - **Refresh protection** — prevent scheduled refreshes from running too frequently.
-- **Persistent state** — retain refresh information across Home Assistant restarts.
-- **Status sensor** — see the current refresh status, last refresh result, repository counts, errors, and next scheduled refresh.
+- **Status sensor** — see the current refresh status and next scheduled refresh.
 - **Refresh completed event** — trigger automations when a refresh finishes.
 - **Configurable** — enable or disable automatic refresh and customize its schedule.
 
@@ -99,14 +98,6 @@ The sensor's **attributes** provide details about the most recent refresh and th
 
 | Attribute | Description |
 | --- | --- |
-| `last_result` | Result of the most recent refresh: `success`, `partial`, or `failed`. |
-| `last_refresh` | Date and time of the most recent refresh. This value is persisted across Home Assistant restarts. |
-| `last_source` | What triggered the refresh, such as `manual` or `scheduled`. |
-| `repositories` | Number of installed HACS repositories included in the refresh. |
-| `successful` | Number of repositories refreshed successfully. |
-| `failed` | Number of repositories that failed to refresh. |
-| `pending` | Number of repositories still pending in the HACS queue. |
-| `last_error` | Error information from the most recent failed or incomplete refresh, if any. |
 | `automatic_refresh` | Whether automatic refresh is enabled. |
 | `schedule_days` | Days configured for automatic refreshes. |
 | `schedule_times` | Times configured for automatic refreshes. |
@@ -118,7 +109,7 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever an actual refresh completes. The event type indicates the result:
+The event fires whenever an actual refresh completes. The event state contains the timestamp of the most recent completed refresh and the event type indicates the result:
 
 - `success` — all repositories refreshed successfully.
 - `partial` — one or more repositories remain pending.
@@ -127,6 +118,7 @@ The event fires whenever an actual refresh completes. The event type indicates t
 The event data includes the refresh source and repository counts, for example:
 
 ```yaml
+event_type: success
 source: scheduled
 repositories: 47
 successful: 47
