@@ -36,7 +36,10 @@ async def async_setup(
         entries = hass.config_entries.async_loaded_entries(DOMAIN)
 
         if not entries:
-            raise ServiceValidationError("HACS Refresh is not configured or loaded")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="service_not_loaded",
+            )
 
         entry = entries[0]
 
