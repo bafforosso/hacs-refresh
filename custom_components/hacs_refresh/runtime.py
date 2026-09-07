@@ -146,7 +146,7 @@ class HacsRefreshRuntimeData:
         """Force-refresh all installed HACS repositories."""
         if self.refresh_in_progress:
             if source == "scheduled":
-                _LOGGER.debug(
+                _LOGGER.warning(
                     "Scheduled HACS refresh skipped because another refresh "
                     "is already in progress"
                 )
@@ -162,7 +162,6 @@ class HacsRefreshRuntimeData:
                 await self._async_do_refresh(source=source)
             except HacsRefreshSkipped:
                 if source == "scheduled":
-                    _LOGGER.debug("Scheduled HACS refresh skipped")
                     return
                 raise
             except HomeAssistantError:
@@ -226,7 +225,7 @@ class HacsRefreshRuntimeData:
             and last_refresh is not None
             and now - last_refresh < MIN_REFRESH_INTERVAL
         ):
-            _LOGGER.debug(
+            _LOGGER.warning(
                 "Scheduled HACS refresh skipped because the minimum refresh "
                 "interval has not elapsed"
             )
@@ -252,7 +251,7 @@ class HacsRefreshRuntimeData:
             self.notify_listeners()
             self._notify_refresh_completed()
 
-            _LOGGER.debug("No installed HACS repositories found")
+            _LOGGER.info("No installed HACS repositories found")
             return
 
         _LOGGER.debug(
