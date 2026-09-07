@@ -2,7 +2,7 @@
 
 [![Made for Home Assistant](https://img.shields.io/badge/Made_for-Homeassistant-blue?style=flat&logo=homeassistant&logoColor=FFFFFF)](https://www.home-assistant.io/)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange?style=flat&logo=homeassistantcommunitystore&logoColor=FFFFFF)](https://hacs.xyz/)
-[![Tests](https://img.shields.io/github/actions/workflow/status/bafforosso/hacs-refresh/tests.yml?style=flat&label=Tests)](https://github.com/bafforosso/hacs-refresh/actions/workflows/tests.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bafforosso/hacs-refresh/tests.yml?branch=main&style=flat&label=Tests)](https://github.com/bafforosso/hacs-refresh/actions/workflows/tests.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
 ![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
 
