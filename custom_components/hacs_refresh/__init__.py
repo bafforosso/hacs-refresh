@@ -12,7 +12,11 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, SERVICE_REFRESH
+from .const import (
+    DOMAIN,
+    REFRESH_SOURCE_MANUAL,
+    SERVICE_REFRESH,
+)
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
@@ -45,7 +49,7 @@ async def async_setup(
 
         runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-        await runtime.async_refresh(source="manual")
+        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
 
     hass.services.async_register(
         DOMAIN,

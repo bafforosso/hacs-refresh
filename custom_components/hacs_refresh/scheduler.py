@@ -13,6 +13,7 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    REFRESH_SOURCE_SCHEDULED,
     WEEKDAYS,
 )
 from .runtime import HacsRefreshRuntimeData
@@ -108,4 +109,6 @@ class HacsRefreshScheduler:
             )
             return
 
-        self.hass.async_create_task(self.runtime.async_refresh(source="scheduled"))
+        self.hass.async_create_task(
+            self.runtime.async_refresh(source=REFRESH_SOURCE_SCHEDULED)
+        )

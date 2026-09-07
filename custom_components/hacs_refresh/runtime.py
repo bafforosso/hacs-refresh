@@ -22,6 +22,9 @@ from .const import (
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
+    REFRESH_SOURCE_SCHEDULED,
+    STATE_IDLE,
+    STATE_REFRESHING,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,7 +51,7 @@ class HacsRefreshRuntimeData:
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()
         self._event_listeners: set[RefreshEventListener] = set()
-        self.state = "idle"
+        self.state = STATE_IDLE
         self.last_result: str | None = None
         self.last_source: str | None = None
         self.last_error: str | None = None
@@ -145,7 +148,7 @@ class HacsRefreshRuntimeData:
     ) -> None:
         """Force-refresh all installed HACS repositories."""
         if self.refresh_in_progress:
-            if source == "scheduled":
+            if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.warning(
                     "Scheduled HACS refresh skipped because another refresh "
                     "is already in progress"
@@ -161,23 +164,23 @@ class HacsRefreshRuntimeData:
             try:
                 await self._async_do_refresh(source=source)
             except HacsRefreshSkipped:
-                if source == "scheduled":
+                if source == REFRESH_SOURCE_SCHEDULED:
                     return
                 raise
             except HomeAssistantError:
-                if source == "scheduled":
+                if source == REFRESH_SOURCE_SCHEDULED:
                     _LOGGER.error("Scheduled HACS refresh failed")
                     return
                 raise
             except Exception as err:
-                self.state = "idle"
+                self.state = STATE_IDLE
                 self.last_result = EVENT_TYPE_FAILED
                 self.last_source = source
                 self.last_error = str(err)
                 self.notify_listeners()
                 self._notify_refresh_completed()
 
-                if source == "scheduled":
+                if source == REFRESH_SOURCE_SCHEDULED:
                     _LOGGER.exception("Scheduled HACS refresh failed")
                     return
 
@@ -206,7 +209,7 @@ class HacsRefreshRuntimeData:
             )
 
         if hacs.queue.running:
-            if source == "scheduled":
+            if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.warning(
                     "Scheduled HACS refresh skipped because the HACS queue "
                     "is already running"
@@ -221,7 +224,7 @@ class HacsRefreshRuntimeData:
         now = dt_util.now()
         last_refresh = self._last_refresh_time()
         if (
-            source == "scheduled"
+            source == REFRESH_SOURCE_SCHEDULED
             and last_refresh is not None
             and now - last_refresh < MIN_REFRESH_INTERVAL
         ):
@@ -233,7 +236,7 @@ class HacsRefreshRuntimeData:
 
         repositories = list(hacs.repositories.list_downloaded)
 
-        self.state = "refreshing"
+        self.state = STATE_REFRESHING
         self.last_source = source
         self.last_error = None
         self.last_repositories = len(repositories)
@@ -244,7 +247,7 @@ class HacsRefreshRuntimeData:
         self.notify_listeners()
 
         if not repositories:
-            self.state = "idle"
+            self.state = STATE_IDLE
             self.last_result = EVENT_TYPE_SUCCESS
             self.last_pending = 0
 
@@ -298,7 +301,7 @@ class HacsRefreshRuntimeData:
                 coordinator.async_update_listeners()
 
         pending = hacs.queue.pending_tasks
-        self.state = "idle"
+        self.state = STATE_IDLE
         self.last_repositories = len(repositories)
         self.last_successful = successful
         self.last_failed = len(failures)

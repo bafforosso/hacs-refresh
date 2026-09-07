@@ -38,7 +38,7 @@ async def test_refresh_service_requires_config_entry(
 
     with pytest.raises(
         ServiceValidationError,
-        match="HACS Refresh is not configured or loaded",
+        match="service_not_loaded",
     ):
         await hass.services.async_call(
             DOMAIN,
