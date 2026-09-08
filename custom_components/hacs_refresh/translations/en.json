@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configuration",
-        "description": "HACS Refresh forces HACS to refresh the metadata of all installed HACS repositories.",
+        "description": "HACS Refresh allows you to schedule or manually trigger refreshes of all installed HACS repositories.",
         "data": {
           "automatic_refresh": "Enable automatic refresh",
           "days": "Days of the week",
@@ -80,7 +80,7 @@
     "step": {
       "init": {
         "title": "Configuration",
-        "description": "Configure automatic HACS repository metadata refreshes. Manual refreshes are always available through the HACS Refresh action, regardless of these settings.",
+        "description": "Configure scheduled refreshes of all installed HACS repositories. Manual refreshes are always available through the HACS Refresh action.",
         "data": {
           "automatic_refresh": "Enable automatic refresh",
           "days": "Days of the week",

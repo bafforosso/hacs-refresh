@@ -76,7 +76,7 @@ A manual refresh can be triggered using the **Refresh** button.
 
 The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions.
 
-Manual refreshes can be triggered regardless of whether automatic refreshes.
+Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
 > [!WARNING]
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
