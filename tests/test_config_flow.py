@@ -79,6 +79,83 @@ async def test_validate_options_returns_normalized_options() -> None:
     }
 
 
+async def test_validate_options_allows_disabled_automatic_refresh() -> None:
+    """Test that automatic refresh can be disabled without a schedule."""
+    handler = MagicMock()
+    handler.options = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon", "wed"],
+        CONF_TIMES: ["03:00", "15:30"],
+    }
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: [],
+        CONF_TIMES: "",
+    }
+
+    result = await _validate_options(
+        handler,
+        user_input,
+    )
+
+    assert result == {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: ["mon", "wed"],
+        CONF_TIMES: ["03:00", "15:30"],
+    }
+
+
+async def test_validate_options_preserves_schedule_when_disabled() -> None:
+    """Test that submitted schedule values are ignored when disabled."""
+    handler = MagicMock()
+    handler.options = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon", "wed"],
+        CONF_TIMES: ["03:00", "15:30"],
+    }
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: ["fri"],
+        CONF_TIMES: "22:00",
+    }
+
+    result = await _validate_options(
+        handler,
+        user_input,
+    )
+
+    assert result == {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: ["mon", "wed"],
+        CONF_TIMES: ["03:00", "15:30"],
+    }
+
+
+async def test_validate_options_uses_default_schedule_when_disabled() -> None:
+    """Test that disabled automatic refresh uses default schedule values."""
+    handler = MagicMock()
+    handler.options = {}
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: [],
+        CONF_TIMES: "",
+    }
+
+    result = await _validate_options(
+        handler,
+        user_input,
+    )
+
+    assert result == {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: DEFAULT_DAYS,
+        CONF_TIMES: DEFAULT_TIMES,
+    }
+
+
 async def test_validate_options_rejects_no_days() -> None:
     """Test that at least one weekday must be selected."""
     handler = MagicMock()
