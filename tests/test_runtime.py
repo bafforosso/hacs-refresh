@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
@@ -33,6 +33,7 @@ def _refresh_result(
     failed: int = 0,
     pending: int = 0,
     failures: tuple[str, ...] = (),
+    duration: float = 2.5,
 ) -> HacsRefreshResult:
     """Create a refresh result for testing."""
     return HacsRefreshResult(
@@ -41,6 +42,7 @@ def _refresh_result(
         failed=failed,
         pending=pending,
         failures=failures,
+        duration=duration,
     )
 
 
@@ -112,7 +114,28 @@ async def test_refresh_succeeds(
     assert runtime.last_successful == 1
     assert runtime.last_failed == 0
     assert runtime.last_pending == 0
+    assert runtime.last_duration == 2.5
     assert runtime.last_error is None
+
+
+async def test_refresh_duration_is_propagated_to_event(
+    hass: HomeAssistant,
+) -> None:
+    """Test that refresh duration is included in the completion event."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    listener = MagicMock()
+    runtime.add_event_listener(listener)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(duration=2.5),
+    )
+
+    await runtime.async_refresh(source="manual")
+
+    listener.assert_called_once()
+    assert listener.call_args.args[1]["duration"] == 2.5
 
 
 async def test_refresh_fails_on_unexpected_error(
