@@ -36,11 +36,17 @@ async def async_get_config_entry_diagnostics(
         },
         "runtime": {
             "state": runtime.state,
+            "last_completed": (
+                runtime.last_completed.isoformat()
+                if runtime.last_completed is not None
+                else None
+            ),
             "last_result": runtime.last_result,
             "last_source": runtime.last_source,
             "last_repositories": runtime.last_repositories,
             "last_successful": runtime.last_successful,
             "last_failed": runtime.last_failed,
             "last_pending": runtime.last_pending,
+            "last_duration": runtime.last_duration,
         },
     }

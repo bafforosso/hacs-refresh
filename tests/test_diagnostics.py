@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -34,12 +36,14 @@ async def test_diagnostics_default_values(
         },
         "runtime": {
             "state": "idle",
+            "last_completed": None,
             "last_result": None,
             "last_source": None,
             "last_repositories": 0,
             "last_successful": 0,
             "last_failed": 0,
             "last_pending": 0,
+            "last_duration": None,
         },
     }
 
@@ -77,23 +81,34 @@ async def test_diagnostics_runtime_state(
     entry.runtime_data = runtime
 
     runtime.state = "idle"
+    runtime.last_completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
     runtime.last_result = "success"
     runtime.last_source = "manual"
     runtime.last_repositories = 5
     runtime.last_successful = 4
     runtime.last_failed = 1
     runtime.last_pending = 0
+    runtime.last_duration = 2.5
 
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
 
     assert diagnostics["runtime"] == {
         "state": "idle",
+        "last_completed": "2026-01-01T02:30:00+00:00",
         "last_result": "success",
         "last_source": "manual",
         "last_repositories": 5,
         "last_successful": 4,
         "last_failed": 1,
         "last_pending": 0,
+        "last_duration": 2.5,
     }
 
 

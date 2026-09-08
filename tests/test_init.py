@@ -101,15 +101,20 @@ async def test_setup_entry_initializes_integration(
         forward_entry_setups,
     )
 
-    with patch(
-        "custom_components.hacs_refresh.HacsRefreshScheduler"
-    ) as scheduler_class:
+    with (
+        patch("custom_components.hacs_refresh.HacsRefreshScheduler") as scheduler_class,
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshRuntimeData.async_initialize",
+            new_callable=AsyncMock,
+        ) as async_initialize,
+    ):
         scheduler = scheduler_class.return_value
         scheduler.async_setup = AsyncMock()
 
         assert await async_setup_entry(hass, config_entry)
 
     assert config_entry.runtime_data is not None
+    async_initialize.assert_awaited_once()
     scheduler_class.assert_called_once_with(
         hass,
         config_entry.runtime_data,

@@ -9,6 +9,8 @@ SERVICE_REFRESH = "refresh"
 
 EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"
 
+STORAGE_VERSION = 2
+
 EVENT_TYPE_SUCCESS = "success"
 EVENT_TYPE_PARTIAL = "partial"
 EVENT_TYPE_FAILED = "failed"
