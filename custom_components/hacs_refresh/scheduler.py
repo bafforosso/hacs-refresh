@@ -13,6 +13,7 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    REFRESH_SOURCE_SCHEDULED,
     WEEKDAYS,
 )
 from .runtime import HacsRefreshRuntimeData
@@ -102,9 +103,12 @@ class HacsRefreshScheduler:
             return
 
         if self.runtime.refresh_in_progress:
-            _LOGGER.debug(
-                "Skipping scheduled HACS refresh because another refresh is already in progress"
+            _LOGGER.warning(
+                "Scheduled HACS refresh skipped because another refresh "
+                "is already in progress"
             )
             return
 
-        self.hass.async_create_task(self.runtime.async_refresh(source="scheduled"))
+        self.hass.async_create_task(
+            self.runtime.async_refresh(source=REFRESH_SOURCE_SCHEDULED)
+        )

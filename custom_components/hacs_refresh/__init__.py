@@ -12,7 +12,11 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, SERVICE_REFRESH
+from .const import (
+    DOMAIN,
+    REFRESH_SOURCE_MANUAL,
+    SERVICE_REFRESH,
+)
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
@@ -36,13 +40,16 @@ async def async_setup(
         entries = hass.config_entries.async_loaded_entries(DOMAIN)
 
         if not entries:
-            raise ServiceValidationError("HACS Refresh is not configured or loaded")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="service_not_loaded",
+            )
 
         entry = entries[0]
 
         runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-        await runtime.async_refresh(source="manual")
+        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
 
     hass.services.async_register(
         DOMAIN,
@@ -65,8 +72,6 @@ async def async_setup_entry(
         hass,
         entry,
     )
-
-    await runtime.async_load()
 
     entry.runtime_data = runtime
 

@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_DAYS,
     DEFAULT_TIMES,
     DOMAIN,
+    INTEGRATION_NAME,
     MAX_TIMES,
     MIN_REFRESH_INTERVAL,
     WEEKDAYS,
@@ -210,4 +211,4 @@ class HacsRefreshConfigFlow(
         options: Mapping[str, Any],
     ) -> str:
         """Return the config entry title."""
-        return "HACS Refresh"
+        return INTEGRATION_NAME

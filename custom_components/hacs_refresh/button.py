@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import REFRESH_SOURCE_MANUAL
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
 
@@ -33,4 +34,4 @@ class HacsRefreshButton(
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.runtime.async_refresh(source="manual")
+        await self.runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configuration",
-        "description": "HACS Refresh forces HACS to refresh the metadata of all installed HACS repositories.",
+        "description": "HACS Refresh allows you to schedule or manually trigger refreshes of all installed HACS repositories.",
         "data": {
           "automatic_refresh": "Enable automatic refresh",
           "days": "Days of the week",
@@ -51,33 +51,36 @@
     }
   },
   "exceptions": {
-    "refresh_in_progress": {
-      "message": "A HACS refresh is already in progress."
-    },
-    "hacs_unavailable": {
-      "message": "HACS is not available."
-    },
     "hacs_disabled": {
       "message": "HACS is disabled."
     },
     "hacs_queue_running": {
       "message": "The HACS queue is already running."
     },
-    "unexpected_refresh_error": {
-      "message": "Unexpected error while refreshing HACS repositories."
+    "hacs_unavailable": {
+      "message": "HACS is not available."
+    },
+    "refresh_in_progress": {
+      "message": "A HACS refresh is already in progress."
+    },
+    "refresh_tasks_failed": {
+      "message": "{failed} of {repositories} HACS repository refreshes failed."
     },
     "refresh_tasks_pending": {
       "message": "{pending} HACS refresh task(s) remain pending."
     },
-    "refresh_tasks_failed": {
-      "message": "{failed} of {repositories} HACS repository refreshes failed."
+    "service_not_loaded": {
+      "message": "HACS Refresh is not configured or loaded."
+    },
+    "unexpected_refresh_error": {
+      "message": "Unexpected error while refreshing HACS repositories."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Configuration",
-        "description": "Configure automatic HACS repository metadata refreshes. Manual refreshes are always available through the HACS Refresh action, regardless of these settings.",
+        "description": "Configure scheduled refreshes of all installed HACS repositories. Manual refreshes are always available through the HACS Refresh action.",
         "data": {
           "automatic_refresh": "Enable automatic refresh",
           "days": "Days of the week",

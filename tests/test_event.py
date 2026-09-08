@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
@@ -39,14 +38,6 @@ def test_refresh_completed_event_triggers_event() -> None:
 
     event_data = {
         "source": "scheduled",
-        "last_refresh": datetime(
-            2026,
-            9,
-            6,
-            2,
-            30,
-            tzinfo=UTC,
-        ).isoformat(),
         "repositories": 5,
         "successful": 5,
         "failed": 0,

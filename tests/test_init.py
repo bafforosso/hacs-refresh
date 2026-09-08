@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,7 +14,6 @@ from custom_components.hacs_refresh import (
     async_setup_entry,
 )
 from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
-from custom_components.hacs_refresh.runtime import HacsRefreshRuntimeData
 
 
 def test_platforms() -> None:
@@ -40,7 +38,7 @@ async def test_refresh_service_requires_config_entry(
 
     with pytest.raises(
         ServiceValidationError,
-        match="HACS Refresh is not configured or loaded",
+        match="service_not_loaded",
     ):
         await hass.services.async_call(
             DOMAIN,
@@ -161,67 +159,3 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
 
     scheduler.async_setup.assert_awaited_once()
     config_entry.runtime_data.notify_listeners.assert_called_once()
-
-
-async def test_setup_entry_restores_persisted_refresh_data(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test that setup restores persisted refresh data."""
-    hass.data["hacs"] = MagicMock()
-
-    forward_entry_setups = AsyncMock()
-    monkeypatch.setattr(
-        hass.config_entries,
-        "async_forward_entry_setups",
-        forward_entry_setups,
-    )
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-    )
-    entry.add_to_hass(hass)
-
-    runtime = HacsRefreshRuntimeData(
-        hass,
-        entry,
-    )
-
-    await runtime._store.async_save(
-        {
-            "last_refresh": "2026-09-04T12:34:56+00:00",
-            "last_result": "success",
-            "last_source": "scheduled",
-            "last_repositories": 10,
-            "last_successful": 9,
-            "last_failed": 1,
-            "last_pending": 0,
-            "last_error": None,
-        }
-    )
-
-    await async_setup_entry(hass, entry)
-
-    runtime = entry.runtime_data
-
-    assert runtime.last_refresh == datetime(
-        2026,
-        9,
-        4,
-        12,
-        34,
-        56,
-        tzinfo=UTC,
-    )
-    assert runtime.last_result == "success"
-    assert runtime.last_source == "scheduled"
-    assert runtime.last_repositories == 10
-    assert runtime.last_successful == 9
-    assert runtime.last_failed == 1
-    assert runtime.last_pending == 0
-    assert runtime.last_error is None
-
-    forward_entry_setups.assert_awaited_once_with(
-        entry,
-        PLATFORMS,
-    )
