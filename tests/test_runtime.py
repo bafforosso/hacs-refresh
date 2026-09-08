@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
@@ -14,10 +14,34 @@ from custom_components.hacs_refresh.const import (
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
 )
+from custom_components.hacs_refresh.hacs import (
+    HacsDisabledError,
+    HacsQueueRunningError,
+    HacsRefreshResult,
+    HacsUnavailableError,
+)
 from custom_components.hacs_refresh.runtime import (
     HacsRefreshRuntimeData,
     HacsRefreshSkipped,
 )
+
+
+def _refresh_result(
+    *,
+    repositories: int = 1,
+    successful: int = 1,
+    failed: int = 0,
+    pending: int = 0,
+    failures: tuple[str, ...] = (),
+) -> HacsRefreshResult:
+    """Create a refresh result for testing."""
+    return HacsRefreshResult(
+        repositories=repositories,
+        successful=successful,
+        failed=failed,
+        pending=pending,
+        failures=failures,
+    )
 
 
 async def test_refresh_fails_when_hacs_is_unavailable(
@@ -28,39 +52,58 @@ async def test_refresh_fails_when_hacs_is_unavailable(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=HacsUnavailableError,
+    )
+
     with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
     assert exc_info.value.translation_key == "hacs_unavailable"
     assert exc_info.value.translation_placeholders is None
+    assert runtime.state == "idle"
+
+
+async def test_refresh_fails_when_hacs_is_disabled(
+    hass: HomeAssistant,
+) -> None:
+    """Test that refresh raises an error when HACS is disabled."""
+    entry = MockConfigEntry(domain=DOMAIN)
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=HacsDisabledError,
+    )
+
+    with pytest.raises(HomeAssistantError) as exc_info:
+        await runtime.async_refresh(source="manual")
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "hacs_disabled"
+    assert exc_info.value.translation_placeholders is None
+    assert runtime.state == "idle"
 
 
 async def test_refresh_succeeds(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test a successful HACS refresh."""
     entry = MockConfigEntry(domain=DOMAIN)
 
-    repository = MagicMock()
-    repository.update_repository = AsyncMock(return_value="update")
-
-    hacs.repositories.list_downloaded = [repository]
-
-    hass.data["hacs"] = hacs
-
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=1,
+            successful=1,
+        ),
+    )
 
     await runtime.async_refresh(source="manual")
 
-    repository.update_repository.assert_awaited_once_with(
-        ignore_issues=True,
-        force=True,
-    )
-    hacs.queue.add.assert_called_once()
-    hacs.async_process_queue.assert_awaited_once()
-    hacs.data.async_write.assert_awaited_once()
+    runtime.hacs.async_refresh.assert_awaited_once()
 
     assert runtime.state == "idle"
     assert runtime.last_result == "success"
@@ -72,39 +115,17 @@ async def test_refresh_succeeds(
     assert runtime.last_error is None
 
 
-async def test_refresh_fails_when_hacs_is_disabled(
-    hass: HomeAssistant,
-    hacs: MagicMock,
-) -> None:
-    """Test that refresh fails when HACS is disabled."""
-    hacs.system.disabled = True
-    hass.data["hacs"] = hacs
-
-    entry = MockConfigEntry(domain=DOMAIN)
-
-    runtime = HacsRefreshRuntimeData(hass, entry)
-
-    with pytest.raises(HomeAssistantError) as exc_info:
-        await runtime.async_refresh(source="manual")
-
-    assert exc_info.value.translation_domain == DOMAIN
-    assert exc_info.value.translation_key == "hacs_disabled"
-    assert exc_info.value.translation_placeholders is None
-
-
 async def test_refresh_fails_on_unexpected_error(
     hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that unexpected refresh errors are translated."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     unexpected_error = RuntimeError("Something went wrong")
-    monkeypatch.setattr(
-        runtime,
-        "_async_do_refresh",
-        AsyncMock(side_effect=unexpected_error),
+
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=unexpected_error,
     )
 
     with pytest.raises(HomeAssistantError) as exc_info:
@@ -114,19 +135,21 @@ async def test_refresh_fails_on_unexpected_error(
     assert exc_info.value.translation_key == "unexpected_refresh_error"
     assert exc_info.value.translation_placeholders is None
     assert exc_info.value.__cause__ is unexpected_error
+    assert runtime.state == "idle"
+    assert runtime.last_result == "failed"
 
 
 async def test_manual_refresh_is_skipped_when_queue_is_running(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test that a manual refresh is skipped when the HACS queue is running."""
-    hacs.queue.running = True
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
 
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=HacsQueueRunningError,
+    )
 
     with pytest.raises(HacsRefreshSkipped) as exc_info:
         await runtime.async_refresh(source="manual")
@@ -134,8 +157,7 @@ async def test_manual_refresh_is_skipped_when_queue_is_running(
     assert exc_info.value.translation_domain == DOMAIN
     assert exc_info.value.translation_key == "hacs_queue_running"
     assert exc_info.value.translation_placeholders is None
-
-    hacs.async_process_queue.assert_not_awaited()
+    assert runtime.state == "idle"
 
 
 async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
@@ -156,21 +178,22 @@ async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
 
 async def test_scheduled_refresh_is_skipped_when_queue_is_running(
     hass: HomeAssistant,
-    hacs: MagicMock,
     caplog,
 ) -> None:
     """Test that a scheduled refresh is skipped when the HACS queue is running."""
-    hacs.queue.running = True
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=HacsQueueRunningError,
+    )
+
     await runtime.async_refresh(source="scheduled")
 
-    hacs.async_process_queue.assert_not_awaited()
+    runtime.hacs.async_refresh.assert_awaited_once()
 
+    assert runtime.state == "idle"
     assert (
         "Scheduled HACS refresh skipped because the HACS queue is already running"
         in caplog.text
@@ -179,17 +202,15 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
 
 async def test_scheduled_refresh_is_skipped_within_minimum_interval(
     hass: HomeAssistant,
-    hacs: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that scheduled refreshes respect the minimum interval."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-    hacs.repositories.list_downloaded = [repository]
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(),
+    )
 
     start = datetime(
         2026,
@@ -227,22 +248,20 @@ async def test_scheduled_refresh_is_skipped_within_minimum_interval(
 
     await runtime.async_refresh(source="scheduled")
 
-    assert hacs.async_process_queue.await_count == 0
+    runtime.hacs.async_refresh.assert_not_awaited()
 
 
 async def test_scheduled_refresh_is_allowed_at_minimum_interval(
     hass: HomeAssistant,
-    hacs: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that the minimum interval is inclusive."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-    hacs.repositories.list_downloaded = [repository]
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(),
+    )
 
     start = datetime(
         2026,
@@ -280,22 +299,20 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
 
     await runtime.async_refresh(source="scheduled")
 
-    assert hacs.async_process_queue.await_count == 1
+    runtime.hacs.async_refresh.assert_awaited_once()
 
 
 async def test_manual_refresh_bypasses_minimum_interval(
     hass: HomeAssistant,
-    hacs: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that manual refreshes bypass the minimum interval."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-    hacs.repositories.list_downloaded = [repository]
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(),
+    )
 
     start = datetime(
         2026,
@@ -333,20 +350,23 @@ async def test_manual_refresh_bypasses_minimum_interval(
 
     await runtime.async_refresh(source="manual")
 
-    assert hacs.async_process_queue.await_count == 1
+    runtime.hacs.async_refresh.assert_awaited_once()
 
 
 async def test_scheduled_refresh_respects_last_refresh_event(
     hass: HomeAssistant,
-    hacs: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that scheduled refreshes respect the last completion event."""
-    hacs.repositories.list_downloaded = []
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=0,
+            successful=0,
+        ),
+    )
 
     last_refresh = datetime(
         2026,
@@ -385,27 +405,25 @@ async def test_scheduled_refresh_respects_last_refresh_event(
     await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
-    hacs.async_process_queue.assert_not_awaited()
+    runtime.hacs.async_refresh.assert_not_awaited()
 
 
 async def test_scheduled_refresh_is_allowed_without_last_refresh_event(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test that scheduled refreshes are allowed when no completion event exists."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-    hacs.repositories.list_downloaded = [repository]
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(),
+    )
 
     await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_SUCCESS
-    hacs.async_process_queue.assert_awaited_once()
+    runtime.hacs.async_refresh.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
@@ -418,17 +436,15 @@ async def test_scheduled_refresh_is_allowed_without_last_refresh_event(
 )
 async def test_scheduled_refresh_is_allowed_without_valid_last_refresh_event(
     hass: HomeAssistant,
-    hacs: MagicMock,
     event_state: str,
 ) -> None:
     """Test that scheduled refreshes are allowed without a valid completion event."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-    hacs.repositories.list_downloaded = [repository]
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(),
+    )
 
     entity_registry = er.async_get(hass)
     entity_registry.async_get_or_create(
@@ -451,20 +467,22 @@ async def test_scheduled_refresh_is_allowed_without_valid_last_refresh_event(
 
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_SUCCESS
-    hacs.async_process_queue.assert_awaited_once()
+    runtime.hacs.async_refresh.assert_awaited_once()
 
 
 async def test_refresh_succeeds_with_no_repositories(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test that refreshing with no repositories is a successful no-op."""
-    hacs.repositories.list_downloaded = []
-    hass.data["hacs"] = hacs
-
     entry = MockConfigEntry(domain=DOMAIN)
-
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=0,
+            successful=0,
+        ),
+    )
 
     await runtime.async_refresh(source="manual")
 
@@ -477,31 +495,23 @@ async def test_refresh_succeeds_with_no_repositories(
     assert runtime.last_pending == 0
     assert runtime.last_error is None
 
-    hacs.queue.add.assert_not_called()
-    hacs.async_process_queue.assert_not_awaited()
-    hacs.data.async_write.assert_not_awaited()
+    runtime.hacs.async_refresh.assert_awaited_once()
 
 
 async def test_refresh_reports_pending_repositories(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test that pending repository refreshes are reported correctly."""
     entry = MockConfigEntry(domain=DOMAIN)
-
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
-
-    hacs.repositories.list_downloaded = [repository]
-
-    async def process_queue() -> None:
-        await hacs.queue.add.call_args.args[0]
-        hacs.queue.pending_tasks = 1
-
-    hacs.async_process_queue = AsyncMock(side_effect=process_queue)
-    hass.data["hacs"] = hacs
-
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=1,
+            successful=1,
+            pending=1,
+        ),
+    )
 
     with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
@@ -524,28 +534,19 @@ async def test_refresh_reports_pending_repositories(
 
 async def test_refresh_reports_repository_failure(
     hass: HomeAssistant,
-    hacs: MagicMock,
 ) -> None:
     """Test that repository refresh failures are reported correctly."""
     entry = MockConfigEntry(domain=DOMAIN)
-
-    successful_repository = MagicMock()
-    successful_repository.update_repository = AsyncMock()
-
-    failed_repository = MagicMock()
-    failed_repository.update_repository = AsyncMock(
-        side_effect=RuntimeError("Something went wrong")
-    )
-    failed_repository.data.full_name = "example/failed-repository"
-
-    hacs.repositories.list_downloaded = [
-        successful_repository,
-        failed_repository,
-    ]
-
-    hass.data["hacs"] = hacs
-
     runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=2,
+            successful=1,
+            failed=1,
+            failures=("example/failed-repository: Something went wrong",),
+        ),
+    )
 
     with pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
@@ -557,15 +558,6 @@ async def test_refresh_reports_repository_failure(
         "repositories": "2",
     }
 
-    successful_repository.update_repository.assert_awaited_once_with(
-        ignore_issues=True,
-        force=True,
-    )
-    failed_repository.update_repository.assert_awaited_once_with(
-        ignore_issues=True,
-        force=True,
-    )
-
     assert runtime.state == "idle"
     assert runtime.last_result == "failed"
     assert runtime.last_source == "manual"
@@ -574,8 +566,3 @@ async def test_refresh_reports_repository_failure(
     assert runtime.last_failed == 1
     assert runtime.last_pending == 0
     assert runtime.last_error == "1 repository refresh task(s) failed"
-
-    hacs.queue.add.assert_called()
-    assert hacs.queue.add.call_count == 2
-    hacs.async_process_queue.assert_awaited_once()
-    hacs.data.async_write.assert_awaited_once()
