@@ -93,32 +93,19 @@ async def _validate_options(
 ) -> dict[str, Any]:
     """Validate and normalize HACS Refresh options."""
     automatic_refresh = user_input[CONF_AUTOMATIC_REFRESH]
-
-    if not automatic_refresh:
-        return {
-            CONF_AUTOMATIC_REFRESH: False,
-            CONF_DAYS: handler.options.get(
-                CONF_DAYS,
-                DEFAULT_DAYS,
-            ),
-            CONF_TIMES: handler.options.get(
-                CONF_TIMES,
-                DEFAULT_TIMES,
-            ),
-        }
-
     days = user_input.get(CONF_DAYS, [])
-
-    if not days:
-        raise SchemaFlowError("no_days")
 
     try:
         times = _parse_times(user_input.get(CONF_TIMES, ""))
     except ValueError as err:
         raise SchemaFlowError("invalid_time") from err
 
-    if not times:
-        raise SchemaFlowError("no_times")
+    if automatic_refresh:
+        if not days:
+            raise SchemaFlowError("no_days")
+
+        if not times:
+            raise SchemaFlowError("no_times")
 
     if len(times) > MAX_TIMES:
         raise SchemaFlowError("too_many_times")
@@ -129,7 +116,7 @@ async def _validate_options(
         raise SchemaFlowError("times_too_close") from err
 
     return {
-        CONF_AUTOMATIC_REFRESH: True,
+        CONF_AUTOMATIC_REFRESH: automatic_refresh,
         CONF_DAYS: _sort_days(days),
         CONF_TIMES: times,
     }
