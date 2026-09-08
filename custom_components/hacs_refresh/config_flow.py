@@ -60,15 +60,7 @@ async def _options_schema(
                     translation_key="weekday",
                 )
             ),
-            vol.Optional(
-                CONF_TIMES,
-                default=", ".join(
-                    options.get(
-                        CONF_TIMES,
-                        DEFAULT_TIMES,
-                    )
-                ),
-            ): selector.TextSelector(),
+            vol.Optional(CONF_TIMES): selector.TextSelector(),
         }
     )
 
@@ -76,8 +68,18 @@ async def _options_schema(
 async def _suggested_values(
     handler: SchemaCommonFlowHandler,
 ) -> dict[str, Any]:
-    """Return stored options in the form's expected representation."""
+    """Return values to pre-fill in the form."""
     options = handler.options
+
+    if isinstance(handler.parent_handler, SchemaConfigFlowHandler):
+        return {
+            CONF_AUTOMATIC_REFRESH: options.get(
+                CONF_AUTOMATIC_REFRESH,
+                DEFAULT_AUTOMATIC_REFRESH,
+            ),
+            CONF_DAYS: options.get(CONF_DAYS, DEFAULT_DAYS),
+            CONF_TIMES: ", ".join(options.get(CONF_TIMES, DEFAULT_TIMES)),
+        }
 
     suggested = dict(options)
 

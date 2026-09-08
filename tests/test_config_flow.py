@@ -1,7 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from homeassistant.helpers.schema_config_entry_flow import SchemaFlowError
+from homeassistant.helpers.schema_config_entry_flow import (
+    SchemaConfigFlowHandler,
+    SchemaFlowError,
+)
 
 from custom_components.hacs_refresh.config_flow import (
     _options_schema,
@@ -333,6 +336,21 @@ async def test_suggested_values_without_times_returns_options() -> None:
     }
 
 
+async def test_suggested_values_uses_defaults_for_config_flow() -> None:
+    """Test that the initial config flow uses default suggested values."""
+    handler = MagicMock()
+    handler.options = {}
+    handler.parent_handler = MagicMock(spec=SchemaConfigFlowHandler)
+
+    result = await _suggested_values(handler)
+
+    assert result == {
+        CONF_AUTOMATIC_REFRESH: DEFAULT_AUTOMATIC_REFRESH,
+        CONF_DAYS: DEFAULT_DAYS,
+        CONF_TIMES: ", ".join(DEFAULT_TIMES),
+    }
+
+
 async def test_options_schema_uses_defaults() -> None:
     """Test that the options schema uses the configured defaults."""
     handler = MagicMock()
@@ -345,7 +363,6 @@ async def test_options_schema_uses_defaults() -> None:
     assert result == {
         CONF_AUTOMATIC_REFRESH: DEFAULT_AUTOMATIC_REFRESH,
         CONF_DAYS: DEFAULT_DAYS,
-        CONF_TIMES: ", ".join(DEFAULT_TIMES),
     }
 
 
@@ -365,7 +382,6 @@ async def test_options_schema_uses_existing_options() -> None:
     assert result == {
         CONF_AUTOMATIC_REFRESH: False,
         CONF_DAYS: ["tue", "fri"],
-        CONF_TIMES: "06:30, 18:00",
     }
 
 
