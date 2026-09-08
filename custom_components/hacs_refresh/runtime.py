@@ -9,15 +9,12 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
-    EVENT_ENTITY_UNIQUE_ID,
     EVENT_TYPE_FAILED,
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
@@ -33,6 +30,7 @@ from .hacs import (
     HacsRefreshResult,
     HacsUnavailableError,
 )
+from .storage import HacsRefreshStore, LastRefreshData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,10 +54,12 @@ class HacsRefreshRuntimeData:
         self.hass = hass
         self.entry = entry
         self.hacs = HacsAdapter(hass)
+        self._store = HacsRefreshStore(hass)
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()
         self._event_listeners: set[RefreshEventListener] = set()
         self.state = STATE_IDLE
+        self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
         self.last_error: str | None = None
@@ -80,29 +80,22 @@ class HacsRefreshRuntimeData:
         """Return whether a refresh is currently in progress."""
         return self._refresh_lock.locked()
 
-    def _last_refresh_time(self) -> datetime | None:
-        """Return the timestamp of the last completed refresh event.
+    async def async_initialize(self) -> None:
+        """Restore persistent refresh state."""
+        data = await self._store.async_load()
+        if data is None:
+            return
 
-        Return None when the event entity has no valid timestamp, allowing
-        scheduled refreshes to proceed when no previous completion is known.
-        """
-        entity_id = er.async_get(self.hass).async_get_entity_id(
-            Platform.EVENT,
-            DOMAIN,
-            EVENT_ENTITY_UNIQUE_ID,
-        )
-        if entity_id is None:
-            return None
-
-        state = self.hass.states.get(entity_id)
-        if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-            return None
-
-        last_refresh = dt_util.parse_datetime(state.state)
-        if last_refresh is None:
-            return None
-
-        return last_refresh
+        completed = dt_util.parse_datetime(data["completed"])
+        if completed is not None:
+            self.last_completed = completed
+        self.last_result = data["result"]
+        self.last_source = data["source"]
+        self.last_duration = data["duration"]
+        self.last_repositories = data["repositories"]
+        self.last_successful = data["successful"]
+        self.last_failed = data["failed"]
+        self.last_pending = data["pending"]
 
     def add_listener(
         self,
@@ -206,7 +199,7 @@ class HacsRefreshRuntimeData:
     ) -> None:
         """Run a HACS refresh and update runtime state."""
         now = dt_util.now()
-        last_refresh = self._last_refresh_time()
+        last_refresh = self.last_completed
 
         if (
             source == REFRESH_SOURCE_SCHEDULED
@@ -261,9 +254,31 @@ class HacsRefreshRuntimeData:
                 translation_key="hacs_queue_running",
             ) from err
 
-        self._update_refresh_result(result, source=source)
+        await self._update_refresh_result(result, source=source)
 
-    def _update_refresh_result(
+    async def _async_save_last_refresh(self) -> None:
+        """Persist the last completed refresh."""
+        if (
+            self.last_completed is None
+            or self.last_result is None
+            or self.last_source is None
+            or self.last_duration is None
+        ):
+            return
+
+        data: LastRefreshData = {
+            "completed": self.last_completed.isoformat(),
+            "result": self.last_result,
+            "source": self.last_source,
+            "duration": self.last_duration,
+            "repositories": self.last_repositories,
+            "successful": self.last_successful,
+            "failed": self.last_failed,
+            "pending": self.last_pending,
+        }
+        await self._store.async_save(data)
+
+    async def _update_refresh_result(
         self,
         result: HacsRefreshResult,
         *,
@@ -271,6 +286,7 @@ class HacsRefreshRuntimeData:
     ) -> None:
         """Update runtime state from a HACS refresh result."""
         self.state = STATE_IDLE
+        self.last_completed = dt_util.now()
         self.last_source = source
         self.last_repositories = result.repositories
         self.last_successful = result.successful
@@ -289,6 +305,8 @@ class HacsRefreshRuntimeData:
         else:
             self.last_result = EVENT_TYPE_SUCCESS
             self.last_error = None
+
+        await self._async_save_last_refresh()
 
         self.notify_listeners()
         self._notify_refresh_completed()

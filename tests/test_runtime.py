@@ -2,15 +2,12 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     DOMAIN,
-    EVENT_ENTITY_UNIQUE_ID,
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
 )
@@ -44,6 +41,47 @@ def _refresh_result(
         failures=failures,
         duration=duration,
     )
+
+
+async def test_runtime_restores_last_completed_state(
+    hass: HomeAssistant,
+) -> None:
+    """Test that runtime restores the last refresh from persistent storage."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+
+    await runtime._store.async_save(
+        {
+            "completed": completed.isoformat(),
+            "result": "success",
+            "source": "scheduled",
+            "duration": 2.5,
+            "repositories": 5,
+            "successful": 5,
+            "failed": 0,
+            "pending": 0,
+        }
+    )
+
+    await runtime.async_initialize()
+
+    assert runtime.last_completed == completed
+    assert runtime.last_result == "success"
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 5
+    assert runtime.last_successful == 5
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
 
 
 async def test_refresh_fails_when_hacs_is_unavailable(
@@ -108,6 +146,7 @@ async def test_refresh_succeeds(
     runtime.hacs.async_refresh.assert_awaited_once()
 
     assert runtime.state == "idle"
+    assert runtime.last_completed is not None
     assert runtime.last_result == "success"
     assert runtime.last_source == "manual"
     assert runtime.last_repositories == 1
@@ -116,6 +155,18 @@ async def test_refresh_succeeds(
     assert runtime.last_pending == 0
     assert runtime.last_duration == 2.5
     assert runtime.last_error is None
+
+    stored = await runtime._store.async_load()
+
+    assert stored is not None
+    assert stored["completed"] == runtime.last_completed.isoformat()
+    assert stored["result"] == "success"
+    assert stored["source"] == "manual"
+    assert stored["duration"] == 2.5
+    assert stored["repositories"] == 1
+    assert stored["successful"] == 1
+    assert stored["failed"] == 0
+    assert stored["pending"] == 0
 
 
 async def test_refresh_duration_is_propagated_to_event(
@@ -244,25 +295,7 @@ async def test_scheduled_refresh_is_skipped_within_minimum_interval(
         tzinfo=UTC,
     )
 
-    entity_registry = er.async_get(hass)
-    entity_registry.async_get_or_create(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-        suggested_object_id="hacs_refresh_refresh_completed",
-    )
-
-    event_entity_id = entity_registry.async_get_entity_id(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-    )
-    assert event_entity_id is not None
-
-    hass.states.async_set(
-        event_entity_id,
-        start.isoformat(),
-    )
+    runtime.last_completed = start
 
     monkeypatch.setattr(
         "custom_components.hacs_refresh.runtime.dt_util.now",
@@ -295,25 +328,7 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
         tzinfo=UTC,
     )
 
-    entity_registry = er.async_get(hass)
-    entity_registry.async_get_or_create(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-        suggested_object_id="hacs_refresh_refresh_completed",
-    )
-
-    event_entity_id = entity_registry.async_get_entity_id(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-    )
-    assert event_entity_id is not None
-
-    hass.states.async_set(
-        event_entity_id,
-        start.isoformat(),
-    )
+    runtime.last_completed = start
 
     monkeypatch.setattr(
         "custom_components.hacs_refresh.runtime.dt_util.now",
@@ -346,25 +361,7 @@ async def test_manual_refresh_bypasses_minimum_interval(
         tzinfo=UTC,
     )
 
-    entity_registry = er.async_get(hass)
-    entity_registry.async_get_or_create(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-        suggested_object_id="hacs_refresh_refresh_completed",
-    )
-
-    event_entity_id = entity_registry.async_get_entity_id(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-    )
-    assert event_entity_id is not None
-
-    hass.states.async_set(
-        event_entity_id,
-        start.isoformat(),
-    )
+    runtime.last_completed = start
 
     monkeypatch.setattr(
         "custom_components.hacs_refresh.runtime.dt_util.now",
@@ -376,11 +373,11 @@ async def test_manual_refresh_bypasses_minimum_interval(
     runtime.hacs.async_refresh.assert_awaited_once()
 
 
-async def test_scheduled_refresh_respects_last_refresh_event(
+async def test_scheduled_refresh_respects_last_completed(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that scheduled refreshes respect the last completion event."""
+    """Test that scheduled refreshes respect the last completed refresh."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
@@ -391,7 +388,7 @@ async def test_scheduled_refresh_respects_last_refresh_event(
         ),
     )
 
-    last_refresh = datetime(
+    last_completed = datetime(
         2026,
         1,
         1,
@@ -400,29 +397,11 @@ async def test_scheduled_refresh_respects_last_refresh_event(
         tzinfo=UTC,
     )
 
-    entity_registry = er.async_get(hass)
-    entity_registry.async_get_or_create(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-        suggested_object_id="hacs_refresh_refresh_completed",
-    )
-
-    event_entity_id = entity_registry.async_get_entity_id(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-    )
-    assert event_entity_id is not None
-
-    hass.states.async_set(
-        event_entity_id,
-        last_refresh.isoformat(),
-    )
+    runtime.last_completed = last_completed
 
     monkeypatch.setattr(
         "custom_components.hacs_refresh.runtime.dt_util.now",
-        lambda: last_refresh + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
+        lambda: last_completed + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
     )
 
     await runtime.async_refresh(source="scheduled")
@@ -431,60 +410,16 @@ async def test_scheduled_refresh_respects_last_refresh_event(
     runtime.hacs.async_refresh.assert_not_awaited()
 
 
-async def test_scheduled_refresh_is_allowed_without_last_refresh_event(
+async def test_scheduled_refresh_is_allowed_without_last_completed(
     hass: HomeAssistant,
 ) -> None:
-    """Test that scheduled refreshes are allowed when no completion event exists."""
+    """Test that scheduled refreshes are allowed without a last completed refresh."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     runtime.hacs.async_refresh = AsyncMock(
         return_value=_refresh_result(),
     )
-
-    await runtime.async_refresh(source="scheduled")
-
-    assert runtime.state == "idle"
-    assert runtime.last_result == EVENT_TYPE_SUCCESS
-    runtime.hacs.async_refresh.assert_awaited_once()
-
-
-@pytest.mark.parametrize(
-    "event_state",
-    [
-        STATE_UNKNOWN,
-        STATE_UNAVAILABLE,
-        "not-a-timestamp",
-    ],
-)
-async def test_scheduled_refresh_is_allowed_without_valid_last_refresh_event(
-    hass: HomeAssistant,
-    event_state: str,
-) -> None:
-    """Test that scheduled refreshes are allowed without a valid completion event."""
-    entry = MockConfigEntry(domain=DOMAIN)
-    runtime = HacsRefreshRuntimeData(hass, entry)
-
-    runtime.hacs.async_refresh = AsyncMock(
-        return_value=_refresh_result(),
-    )
-
-    entity_registry = er.async_get(hass)
-    entity_registry.async_get_or_create(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-        suggested_object_id="hacs_refresh_refresh_completed",
-    )
-
-    event_entity_id = entity_registry.async_get_entity_id(
-        Platform.EVENT,
-        DOMAIN,
-        EVENT_ENTITY_UNIQUE_ID,
-    )
-    assert event_entity_id is not None
-
-    hass.states.async_set(event_entity_id, event_state)
 
     await runtime.async_refresh(source="scheduled")
 

@@ -75,6 +75,8 @@ async def async_setup_entry(
 
     entry.runtime_data = runtime
 
+    await runtime.async_initialize()
+
     scheduler = HacsRefreshScheduler(
         hass,
         runtime,
