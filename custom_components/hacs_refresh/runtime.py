@@ -63,6 +63,7 @@ class HacsRefreshRuntimeData:
         self.last_result: str | None = None
         self.last_source: str | None = None
         self.last_error: str | None = None
+        self.last_duration: float | None = None
 
         self.last_repositories = 0
         self.last_successful = 0
@@ -139,6 +140,7 @@ class HacsRefreshRuntimeData:
             "failed": self.last_failed,
             "pending": self.last_pending,
             "last_error": self.last_error,
+            "duration": self.last_duration,
         }
 
         for listener in tuple(self._event_listeners):
@@ -274,6 +276,7 @@ class HacsRefreshRuntimeData:
         self.last_successful = result.successful
         self.last_failed = result.failed
         self.last_pending = result.pending
+        self.last_duration = result.duration
 
         if result.pending:
             self.last_result = EVENT_TYPE_PARTIAL

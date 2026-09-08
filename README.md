@@ -114,6 +114,7 @@ Its state contains the timestamp of the most recent completed refresh, while the
 | --- | --- |
 | `event_type` | Result of the refresh: `success`, `partial`, or `failed`. |
 | `source` | What triggered the refresh, such as `scheduled` or `manual`. |
+| `duration` | Duration of the refresh in seconds. |
 | `repositories` | Total number of repositories included in the refresh. |
 | `successful` | Number of repositories refreshed successfully. |
 | `failed` | Number of repositories that failed to refresh. |

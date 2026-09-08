@@ -38,6 +38,7 @@ def test_refresh_completed_event_triggers_event() -> None:
 
     event_data = {
         "source": "scheduled",
+        "duration": 2.5,
         "repositories": 5,
         "successful": 5,
         "failed": 0,
