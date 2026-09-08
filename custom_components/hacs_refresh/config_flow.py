@@ -46,7 +46,7 @@ async def _options_schema(
                     DEFAULT_AUTOMATIC_REFRESH,
                 ),
             ): selector.BooleanSelector(),
-            vol.Required(
+            vol.Optional(
                 CONF_DAYS,
                 default=options.get(
                     CONF_DAYS,
@@ -60,7 +60,7 @@ async def _options_schema(
                     translation_key="weekday",
                 )
             ),
-            vol.Required(
+            vol.Optional(
                 CONF_TIMES,
                 default=", ".join(
                     options.get(
@@ -92,13 +92,28 @@ async def _validate_options(
     user_input: dict[str, Any],
 ) -> dict[str, Any]:
     """Validate and normalize HACS Refresh options."""
-    days = user_input[CONF_DAYS]
+    automatic_refresh = user_input[CONF_AUTOMATIC_REFRESH]
+
+    if not automatic_refresh:
+        return {
+            CONF_AUTOMATIC_REFRESH: False,
+            CONF_DAYS: handler.options.get(
+                CONF_DAYS,
+                DEFAULT_DAYS,
+            ),
+            CONF_TIMES: handler.options.get(
+                CONF_TIMES,
+                DEFAULT_TIMES,
+            ),
+        }
+
+    days = user_input.get(CONF_DAYS, [])
 
     if not days:
         raise SchemaFlowError("no_days")
 
     try:
-        times = _parse_times(user_input[CONF_TIMES])
+        times = _parse_times(user_input.get(CONF_TIMES, ""))
     except ValueError as err:
         raise SchemaFlowError("invalid_time") from err
 
@@ -114,7 +129,7 @@ async def _validate_options(
         raise SchemaFlowError("times_too_close") from err
 
     return {
-        CONF_AUTOMATIC_REFRESH: user_input[CONF_AUTOMATIC_REFRESH],
+        CONF_AUTOMATIC_REFRESH: True,
         CONF_DAYS: _sort_days(days),
         CONF_TIMES: times,
     }
