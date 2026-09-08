@@ -6,16 +6,17 @@
 [![GitHub Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
 ![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
 
-A Home Assistant custom integration that lets you manually or automatically refresh the metadata of all installed HACS repositories.
+A Home Assistant custom integration that helps you keep your installed HACS repositories up to date with scheduled or on-demand refreshes.
+
+HACS normally checks for repository updates automatically, but detection of newly released versions can sometimes be delayed. HACS Refresh complements HACS by giving users more control over when installed repository data is refreshed, either automatically on a schedule or manually whenever needed.
 
 ## Features
 
-- **Manual refresh** — refresh all installed HACS repositories from the **Refresh** button or action.
-- **Automatic refresh** — schedule refreshes for selected days and times.
+- **Automatic refresh** — configure refreshes for selected days and times or disable.
+- **Manual refresh** — trigger an immediate refresh from the **Refresh** button or action.
 - **Refresh protection** — prevent scheduled refreshes from running too frequently.
-- **Status sensor** — see the current refresh status and next scheduled refresh.
-- **Refresh completed event** — trigger automations when a refresh finishes.
-- **Configurable** — enable or disable automatic refresh and customize its schedule.
+- **Refresh completed event** — report details of the last refresh and trigger automations when it completes.
+- **Status sensor** — monitor refresh state and schedule configuration.
 
 ## Requirements
 
@@ -63,23 +64,22 @@ Alternatively, you can add the repository manually:
 
 HACS Refresh lets you control when automatic refreshes run.
 
-- **Automatic refresh** — enable or disable scheduled refreshes.
+- **Automatic refresh** — enable or disable scheduled automatic refreshes.
 - **Days of the week** — choose one or more days on which automatic refreshes should run.
 - **Refresh times** — choose one or more times of day for the refreshes.
 
-Refresh times must use the `HH:MM` format and be separated by commas.
-
-For example:
-
-`03:00, 15:00`
-
-The configured schedule applies only to automatic refreshes. Manual refreshes can also be triggered regardless of whether automatic refresh is enabled.
+Refresh times must use the `HH:MM` format and be separated by commas. For example: `03:00, 15:00`
 
 ## Manual Refresh
 
 A manual refresh can be triggered using the **Refresh** button.
 
 The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions.
+
+Manual refreshes can be triggered regardless of whether automatic refreshes.
+
+> [!WARNING]
+> Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
 
 ## Status Sensor
 
@@ -92,7 +92,7 @@ The sensor **state** shows whether a refresh is currently running:
 - `idle` — no refresh is currently running.
 - `refreshing` — a refresh is currently in progress.
 
-The sensor's **attributes** provide details about the most recent refresh and the configured automatic refresh schedule:
+The sensor's **attributes** provide details about the configured automatic refresh schedule:
 
 | Attribute | Description |
 | --- | --- |
@@ -107,22 +107,15 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever an actual refresh attempt completes. The event state contains the timestamp of the most recent completed refresh and the event type indicates the result:
+The event fires whenever an actual refresh attempt completes and can be used in automations or other Home Assistant features or for monitoring.
+Its state contains the timestamp of the most recent completed refresh, while the event data provides details about that refresh.
 
-- `success` — all repositories refreshed successfully.
-- `partial` — one or more repositories remain pending.
-- `failed` — one or more repositories failed to refresh.
-
-The event data includes the refresh source and repository counts, for example:
-
-```yaml
-event_type: success
-source: scheduled
-repositories: 47
-successful: 47
-failed: 0
-pending: 0
-last_error: null
-```
-
-The event type is available to automations as `success`, `partial`, or `failed`.
+| Data | Description |
+| --- | --- |
+| `event_type` | Result of the refresh: `success`, `partial`, or `failed`. |
+| `source` | What triggered the refresh, such as `scheduled` or `manual`. |
+| `repositories` | Total number of repositories included in the refresh. |
+| `successful` | Number of repositories refreshed successfully. |
+| `failed` | Number of repositories that failed to refresh. |
+| `pending` | Number of repositories that remain pending. |
+| `last_error` | Error message from the refresh, or `null` if there was no error. |
