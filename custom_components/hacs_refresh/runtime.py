@@ -54,7 +54,7 @@ class HacsRefreshRuntimeData:
         self.hass = hass
         self.entry = entry
         self.hacs = HacsAdapter(hass)
-        self._store = HacsRefreshStore(hass, entry.entry_id)
+        self._store = HacsRefreshStore(hass)
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()
         self._event_listeners: set[RefreshEventListener] = set()
