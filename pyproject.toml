@@ -26,6 +26,7 @@ ignore_missing_imports = true
 [dependency-groups]
 dev = [
     "mypy",
+    "pre-commit",
     "pytest",
     "pytest-cov",
     "pytest-homeassistant-custom-component",
