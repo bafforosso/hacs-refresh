@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  package:
+    name: Package release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Create release ZIP
+        run: |
+          cd custom_components/hacs_refresh
+          zip "$GITHUB_WORKSPACE/hacs_refresh.zip" -r ./
+
+      - name: Upload release ZIP
+        run: gh release upload "${{ github.event.release.tag_name }}" "$GITHUB_WORKSPACE/hacs_refresh.zip"
+        env:
+          GH_TOKEN: ${{ github.token }}
