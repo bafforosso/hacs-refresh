@@ -124,6 +124,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
 
     mock_refresh.assert_awaited_once_with(source="scheduled")
 
+
 async def test_scheduler_skips_non_configured_day(
     hass: HomeAssistant,
 ) -> None:

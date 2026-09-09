@@ -58,15 +58,18 @@ async def test_refresh_service_triggers_manual_refresh(
     config_entry = MagicMock()
     config_entry.runtime_data = runtime
 
-    with patch.object(
-        hass.config_entries,
-        "async_loaded_entries",
-        return_value=[config_entry],
-    ), patch.object(
-        runtime,
-        "async_refresh",
-        new_callable=AsyncMock,
-    ) as mock_refresh:
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_loaded_entries",
+            return_value=[config_entry],
+        ),
+        patch.object(
+            runtime,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+    ):
         await hass.services.async_call(
             DOMAIN,
             SERVICE_REFRESH,

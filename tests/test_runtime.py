@@ -144,12 +144,15 @@ async def test_refresh_fails_when_hacs_is_unavailable(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        side_effect=HacsUnavailableError,
-    ), pytest.raises(HomeAssistantError) as exc_info:
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            side_effect=HacsUnavailableError,
+        ),
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -166,12 +169,15 @@ async def test_refresh_fails_when_hacs_is_disabled(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        side_effect=HacsDisabledError,
-    ), pytest.raises(HomeAssistantError) as exc_info:
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            side_effect=HacsDisabledError,
+        ),
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -299,12 +305,15 @@ async def test_refresh_fails_on_unexpected_error(
 
     unexpected_error = RuntimeError("Something went wrong")
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        side_effect=unexpected_error,
-    ), pytest.raises(HomeAssistantError) as exc_info:
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            side_effect=unexpected_error,
+        ),
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -355,12 +364,15 @@ async def test_manual_refresh_is_skipped_when_queue_is_running(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        side_effect=HacsQueueRunningError,
-    ), pytest.raises(HacsRefreshSkipped) as exc_info:
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            side_effect=HacsQueueRunningError,
+        ),
+        pytest.raises(HacsRefreshSkipped) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -539,7 +551,6 @@ async def test_manual_refresh_bypasses_minimum_interval(
         new_callable=AsyncMock,
         return_value=_refresh_result(),
     ) as mock_refresh:
-
         start = datetime(
             2026,
             1,
@@ -659,6 +670,7 @@ async def test_last_refresh_is_not_saved_when_state_is_incomplete(
 
     mock_save.assert_not_awaited()
 
+
 async def test_refresh_succeeds_with_no_repositories(
     hass: HomeAssistant,
 ) -> None:
@@ -696,16 +708,19 @@ async def test_refresh_reports_pending_repositories(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        return_value=_refresh_result(
-            repositories=1,
-            successful=1,
-            pending=1,
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(
+                repositories=1,
+                successful=1,
+                pending=1,
+            ),
         ),
-    ), pytest.raises(HomeAssistantError) as exc_info:
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -731,17 +746,20 @@ async def test_refresh_reports_repository_failure(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        return_value=_refresh_result(
-            repositories=2,
-            successful=1,
-            failed=1,
-            failures=("example/failed-repository: Something went wrong",),
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(
+                repositories=2,
+                successful=1,
+                failed=1,
+                failures=("example/failed-repository: Something went wrong",),
+            ),
         ),
-    ), pytest.raises(HomeAssistantError) as exc_info:
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
