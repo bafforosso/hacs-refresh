@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Python ${{ matrix.python-version }}
+  locked-tests:
+    name: Locked dependencies / Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -34,3 +34,18 @@ jobs:
 
       - name: Run tests
         run: uv run --locked pytest
+
+  minimum-ha:
+    name: Home Assistant 2024.12.0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Run tests
+        run: uv run --python 3.12 --locked --with pytest-homeassistant-custom-component==0.13.190 pytest
