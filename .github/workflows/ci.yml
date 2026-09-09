@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 concurrency:
@@ -36,7 +38,6 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - "3.12"
           - "3.14"
 
     steps:
@@ -70,13 +71,13 @@ jobs:
         run: uv run --python 3.12 --locked --with pytest-homeassistant-custom-component==0.13.190 pytest
 
   coverage:
-    name: Test coverage
+    name: Python 3.12 + coverage
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install uv
+      - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           enable-cache: true
