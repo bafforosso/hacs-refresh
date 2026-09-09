@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     EVENT_ENTITY_UNIQUE_ID,
@@ -22,7 +22,7 @@ from .runtime import HacsRefreshRuntimeData
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HACS Refresh event entity."""
     runtime: HacsRefreshRuntimeData = entry.runtime_data
