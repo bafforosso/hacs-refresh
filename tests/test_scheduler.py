@@ -100,14 +100,19 @@ async def test_scheduler_triggers_refresh_on_configured_day(
     )
 
     runtime = HacsRefreshRuntimeData(hass, entry)
-    runtime.async_refresh = AsyncMock()
-
     scheduler = HacsRefreshScheduler(hass, runtime)
 
-    with patch.object(
-        hass,
-        "async_create_task",
-    ) as create_task_mock:
+    with (
+        patch.object(
+            runtime,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch.object(
+            hass,
+            "async_create_task",
+        ) as create_task_mock,
+    ):
         scheduler._handle_scheduled_time(
             datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
         )
@@ -117,7 +122,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
         refresh_coroutine = create_task_mock.call_args.args[0]
         await refresh_coroutine
 
-    runtime.async_refresh.assert_awaited_once_with(source="scheduled")
+    mock_refresh.assert_awaited_once_with(source="scheduled")
 
 
 async def test_scheduler_skips_non_configured_day(
@@ -134,21 +139,26 @@ async def test_scheduler_skips_non_configured_day(
     )
 
     runtime = HacsRefreshRuntimeData(hass, entry)
-    runtime.async_refresh = AsyncMock()
-
     scheduler = HacsRefreshScheduler(hass, runtime)
 
-    with patch.object(
-        hass,
-        "async_create_task",
-    ) as create_task_mock:
+    with (
+        patch.object(
+            runtime,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch.object(
+            hass,
+            "async_create_task",
+        ) as create_task_mock,
+    ):
         # Tuesday — Monday is the only configured day.
         scheduler._handle_scheduled_time(
             datetime(2026, 9, 1, 3, 0),  # noqa: DTZ001
         )
 
     create_task_mock.assert_not_called()
-    runtime.async_refresh.assert_not_awaited()
+    mock_refresh.assert_not_awaited()
 
 
 async def test_scheduler_skips_when_refresh_is_in_progress(
@@ -165,13 +175,9 @@ async def test_scheduler_skips_when_refresh_is_in_progress(
     )
 
     runtime = HacsRefreshRuntimeData(hass, entry)
-    runtime.async_refresh = AsyncMock()
-
     scheduler = HacsRefreshScheduler(hass, runtime)
 
-    await runtime._refresh_lock.acquire()
-
-    try:
+    async with runtime._refresh_lock:
         assert runtime.refresh_in_progress is True
 
         with patch.object(
@@ -183,9 +189,6 @@ async def test_scheduler_skips_when_refresh_is_in_progress(
             )
 
         create_task_mock.assert_not_called()
-        runtime.async_refresh.assert_not_awaited()
-    finally:
-        runtime._refresh_lock.release()
 
 
 def test_scheduler_unload_removes_registered_listeners(

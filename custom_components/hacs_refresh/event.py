@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     EVENT_ENTITY_UNIQUE_ID,
@@ -22,7 +22,7 @@ from .runtime import HacsRefreshRuntimeData
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HACS Refresh event entity."""
     runtime: HacsRefreshRuntimeData = entry.runtime_data
@@ -39,11 +39,6 @@ class HacsRefreshCompletedEvent(
     _attr_translation_key = "refresh_completed"
     _attr_should_poll = False
     _attr_unique_id = EVENT_ENTITY_UNIQUE_ID
-    _attr_event_types: ClassVar[list[str]] = [
-        EVENT_TYPE_SUCCESS,
-        EVENT_TYPE_PARTIAL,
-        EVENT_TYPE_FAILED,
-    ]
 
     def __init__(
         self,
@@ -51,6 +46,11 @@ class HacsRefreshCompletedEvent(
     ) -> None:
         """Initialize the event entity."""
         super().__init__(runtime)
+        self._attr_event_types = [
+            EVENT_TYPE_SUCCESS,
+            EVENT_TYPE_PARTIAL,
+            EVENT_TYPE_FAILED,
+        ]
 
     async def async_added_to_hass(self) -> None:
         """Register the runtime listener."""

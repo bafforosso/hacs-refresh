@@ -15,6 +15,7 @@ class HacsRefreshEntity:
     """Base entity for HACS Refresh."""
 
     _attr_has_entity_name = True
+    _attr_device_info: DeviceInfo | None
 
     def __init__(
         self,

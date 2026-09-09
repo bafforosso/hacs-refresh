@@ -1,7 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from homeassistant.helpers.schema_config_entry_flow import SchemaFlowError
+from homeassistant.helpers.schema_config_entry_flow import (
+    SchemaConfigFlowHandler,
+    SchemaFlowError,
+)
 
 from custom_components.hacs_refresh.config_flow import (
     _options_schema,
@@ -82,11 +85,6 @@ async def test_validate_options_returns_normalized_options() -> None:
 async def test_validate_options_allows_disabled_automatic_refresh() -> None:
     """Test that automatic refresh can be disabled without a schedule."""
     handler = MagicMock()
-    handler.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["mon", "wed"],
-        CONF_TIMES: ["03:00", "15:30"],
-    }
 
     user_input = {
         CONF_AUTOMATIC_REFRESH: False,
@@ -101,19 +99,14 @@ async def test_validate_options_allows_disabled_automatic_refresh() -> None:
 
     assert result == {
         CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: ["mon", "wed"],
-        CONF_TIMES: ["03:00", "15:30"],
+        CONF_DAYS: [],
+        CONF_TIMES: [],
     }
 
 
-async def test_validate_options_preserves_schedule_when_disabled() -> None:
-    """Test that submitted schedule values are ignored when disabled."""
+async def test_validate_options_accepts_schedule_when_disabled() -> None:
+    """Test that a schedule can be configured while automatic refresh is disabled."""
     handler = MagicMock()
-    handler.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["mon", "wed"],
-        CONF_TIMES: ["03:00", "15:30"],
-    }
 
     user_input = {
         CONF_AUTOMATIC_REFRESH: False,
@@ -128,19 +121,18 @@ async def test_validate_options_preserves_schedule_when_disabled() -> None:
 
     assert result == {
         CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: ["mon", "wed"],
-        CONF_TIMES: ["03:00", "15:30"],
+        CONF_DAYS: ["fri"],
+        CONF_TIMES: ["22:00"],
     }
 
 
-async def test_validate_options_uses_default_schedule_when_disabled() -> None:
-    """Test that disabled automatic refresh uses default schedule values."""
+async def test_validate_options_allows_partial_schedule_when_disabled() -> None:
+    """Test that an incomplete schedule is allowed when automatic refresh is disabled."""
     handler = MagicMock()
-    handler.options = {}
 
     user_input = {
         CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: [],
+        CONF_DAYS: ["fri"],
         CONF_TIMES: "",
     }
 
@@ -151,8 +143,8 @@ async def test_validate_options_uses_default_schedule_when_disabled() -> None:
 
     assert result == {
         CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: DEFAULT_DAYS,
-        CONF_TIMES: DEFAULT_TIMES,
+        CONF_DAYS: ["fri"],
+        CONF_TIMES: [],
     }
 
 
@@ -185,6 +177,26 @@ async def test_validate_options_rejects_invalid_time() -> None:
     user_input = {
         CONF_AUTOMATIC_REFRESH: True,
         CONF_DAYS: ["mon"],
+        CONF_TIMES: "25:00",
+    }
+
+    with pytest.raises(
+        SchemaFlowError,
+        match="invalid_time",
+    ):
+        await _validate_options(
+            handler,
+            user_input,
+        )
+
+
+async def test_validate_options_rejects_invalid_time_when_disabled() -> None:
+    """Test that invalid times are rejected when automatic refresh is disabled."""
+    handler = MagicMock()
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: [],
         CONF_TIMES: "25:00",
     }
 
@@ -324,6 +336,21 @@ async def test_suggested_values_without_times_returns_options() -> None:
     }
 
 
+async def test_suggested_values_uses_defaults_for_config_flow() -> None:
+    """Test that the initial config flow uses default suggested values."""
+    handler = MagicMock()
+    handler.options = {}
+    handler.parent_handler = MagicMock(spec=SchemaConfigFlowHandler)
+
+    result = await _suggested_values(handler)
+
+    assert result == {
+        CONF_AUTOMATIC_REFRESH: DEFAULT_AUTOMATIC_REFRESH,
+        CONF_DAYS: DEFAULT_DAYS,
+        CONF_TIMES: ", ".join(DEFAULT_TIMES),
+    }
+
+
 async def test_options_schema_uses_defaults() -> None:
     """Test that the options schema uses the configured defaults."""
     handler = MagicMock()
@@ -336,7 +363,6 @@ async def test_options_schema_uses_defaults() -> None:
     assert result == {
         CONF_AUTOMATIC_REFRESH: DEFAULT_AUTOMATIC_REFRESH,
         CONF_DAYS: DEFAULT_DAYS,
-        CONF_TIMES: ", ".join(DEFAULT_TIMES),
     }
 
 
@@ -356,7 +382,6 @@ async def test_options_schema_uses_existing_options() -> None:
     assert result == {
         CONF_AUTOMATIC_REFRESH: False,
         CONF_DAYS: ["tue", "fri"],
-        CONF_TIMES: "06:30, 18:00",
     }
 
 

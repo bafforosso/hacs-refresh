@@ -10,6 +10,8 @@ A Home Assistant custom integration that helps you keep your installed HACS repo
 
 HACS normally checks for repository updates automatically, but detection of newly released versions can sometimes be delayed. HACS Refresh complements HACS by giving users more control over when installed repository data is refreshed, either automatically on a schedule or manually whenever needed.
 
+> *HACS Refresh does not install or upgrade repositories; it only refreshes the metadata HACS uses to detect available updates. Any available update will then appear in Home Assistant's Updates.*
+
 ## Features
 
 - **Automatic refresh** — configure refreshes for selected days and times or disable.
