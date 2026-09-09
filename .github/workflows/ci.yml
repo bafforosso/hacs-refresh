@@ -24,6 +24,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          python-version: "3.12"
 
       - name: Run pre-commit
         run: uv run --locked pre-commit run --all-files
@@ -79,6 +80,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           enable-cache: true
+          python-version: "3.12"
 
       - name: Run tests with coverage
         run: uv run --locked pytest --cov=. --cov-report=term-missing
