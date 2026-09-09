@@ -12,6 +12,7 @@ from custom_components.hacs_refresh import (
     PLATFORMS,
     async_setup,
     async_setup_entry,
+    async_unload_entry,
 )
 from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
 
@@ -164,3 +165,23 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
 
     scheduler.async_setup.assert_awaited_once()
     config_entry.runtime_data.notify_listeners.assert_called_once()
+
+
+async def test_unload_entry_unloads_platforms(
+    hass: HomeAssistant,
+) -> None:
+    """Test that unloading the integration unloads its platforms."""
+    config_entry = MockConfigEntry(domain=DOMAIN)
+    unload_platforms = AsyncMock(return_value=True)
+
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        unload_platforms,
+    ):
+        assert await async_unload_entry(hass, config_entry)
+
+    unload_platforms.assert_awaited_once_with(
+        config_entry,
+        PLATFORMS,
+    )

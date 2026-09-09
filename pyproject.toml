@@ -12,9 +12,16 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 95
+
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "pytest-homeassistant-custom-component",
     "ruff>=0.16.6",
 ]

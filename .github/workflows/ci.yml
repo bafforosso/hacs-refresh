@@ -42,10 +42,27 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: "3.12"
+
       - name: Run tests
         run: uv run --python 3.12 --locked --with pytest-homeassistant-custom-component==0.13.190 pytest
+
+  coverage:
+    name: Test coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          enable-cache: true
+
+      - name: Run tests with coverage
+        run: uv run --locked pytest --cov=. --cov-report=term-missing

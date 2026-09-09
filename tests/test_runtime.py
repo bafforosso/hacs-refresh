@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     DOMAIN,
+    EVENT_TYPE_FAILED,
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
 )
@@ -82,6 +83,57 @@ async def test_runtime_restores_last_completed_state(
     assert runtime.last_successful == 5
     assert runtime.last_failed == 0
     assert runtime.last_pending == 0
+
+
+async def test_runtime_ignores_invalid_last_completed_timestamp(
+    hass: HomeAssistant,
+) -> None:
+    """Test that an invalid persisted timestamp does not break state restoration."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    await runtime._store.async_save(
+        {
+            "completed": "not-a-datetime",
+            "result": "success",
+            "source": "scheduled",
+            "duration": 2.5,
+            "repositories": 5,
+            "successful": 5,
+            "failed": 0,
+            "pending": 0,
+        }
+    )
+
+    await runtime.async_initialize()
+
+    assert runtime.last_completed is None
+    assert runtime.last_result == "success"
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 5
+    assert runtime.last_successful == 5
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
+
+
+def test_runtime_listener_can_be_added_and_removed(
+    hass: HomeAssistant,
+) -> None:
+    """Test that runtime listeners are notified and can be removed."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+
+    remove_listener = runtime.add_listener(listener)
+
+    runtime.notify_listeners()
+    listener.assert_called_once_with()
+
+    remove_listener()
+
+    runtime.notify_listeners()
+    listener.assert_called_once_with()
 
 
 async def test_refresh_fails_when_hacs_is_unavailable(
@@ -189,6 +241,49 @@ async def test_refresh_duration_is_propagated_to_event(
     assert listener.call_args.args[1]["duration"] == 2.5
 
 
+def test_runtime_event_listener_can_be_added_and_removed(
+    hass: HomeAssistant,
+) -> None:
+    """Test event listener registration, notification, and removal."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+
+    remove_listener = runtime.add_event_listener(listener)
+
+    runtime._notify_refresh_completed()
+    listener.assert_not_called()
+
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = "manual"
+    runtime.last_repositories = 1
+    runtime.last_successful = 1
+    runtime.last_failed = 0
+    runtime.last_pending = 0
+    runtime.last_error = None
+    runtime.last_duration = 2.5
+
+    runtime._notify_refresh_completed()
+
+    listener.assert_called_once_with(
+        EVENT_TYPE_SUCCESS,
+        {
+            "source": "manual",
+            "repositories": 1,
+            "successful": 1,
+            "failed": 0,
+            "pending": 0,
+            "last_error": None,
+            "duration": 2.5,
+        },
+    )
+
+    remove_listener()
+
+    runtime._notify_refresh_completed()
+    listener.assert_called_once()
+
+
 async def test_refresh_fails_on_unexpected_error(
     hass: HomeAssistant,
 ) -> None:
@@ -211,6 +306,36 @@ async def test_refresh_fails_on_unexpected_error(
     assert exc_info.value.__cause__ is unexpected_error
     assert runtime.state == "idle"
     assert runtime.last_result == "failed"
+
+
+async def test_scheduled_refresh_suppresses_unexpected_error(
+    hass: HomeAssistant,
+    caplog,
+) -> None:
+    """Test that unexpected scheduled refresh errors are recorded and suppressed."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+    runtime.add_event_listener(listener)
+
+    unexpected_error = RuntimeError("Something went wrong")
+    runtime.hacs.async_refresh = AsyncMock(
+        side_effect=unexpected_error,
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    assert runtime.state == "idle"
+    assert runtime.last_result == EVENT_TYPE_FAILED
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_error == "Something went wrong"
+
+    listener.assert_called_once()
+    assert listener.call_args.args[0] == EVENT_TYPE_FAILED
+    assert listener.call_args.args[1]["source"] == "scheduled"
+    assert listener.call_args.args[1]["last_error"] == "Something went wrong"
+
+    assert "Scheduled HACS refresh failed" in caplog.text
 
 
 async def test_manual_refresh_is_skipped_when_queue_is_running(
@@ -250,6 +375,23 @@ async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
     assert exc_info.value.translation_placeholders is None
 
 
+async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
+    hass: HomeAssistant,
+    caplog,
+) -> None:
+    """Test that scheduled refreshes are skipped while another refresh is running."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    async with runtime._refresh_lock:
+        await runtime.async_refresh(source="scheduled")
+
+    assert (
+        "Scheduled HACS refresh skipped because another refresh is already in progress"
+        in caplog.text
+    )
+
+
 async def test_scheduled_refresh_is_skipped_when_queue_is_running(
     hass: HomeAssistant,
     caplog,
@@ -272,6 +414,31 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
         "Scheduled HACS refresh skipped because the HACS queue is already running"
         in caplog.text
     )
+
+
+async def test_scheduled_refresh_suppresses_refresh_error(
+    hass: HomeAssistant,
+    caplog,
+) -> None:
+    """Test that scheduled refresh errors are logged instead of raised."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime.hacs.async_refresh = AsyncMock(
+        return_value=_refresh_result(
+            repositories=1,
+            successful=1,
+            pending=1,
+        ),
+    )
+
+    await runtime.async_refresh(source="scheduled")
+
+    assert runtime.state == "idle"
+    assert runtime.last_result == "partial"
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_pending == 1
+    assert "Scheduled HACS refresh failed" in caplog.text
 
 
 async def test_scheduled_refresh_is_skipped_within_minimum_interval(
@@ -426,6 +593,43 @@ async def test_scheduled_refresh_is_allowed_without_last_completed(
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_SUCCESS
     runtime.hacs.async_refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "last_completed",
+        "last_result",
+        "last_source",
+        "last_duration",
+    ],
+)
+async def test_last_refresh_is_not_saved_when_state_is_incomplete(
+    hass: HomeAssistant,
+    missing_field: str,
+) -> None:
+    """Test that incomplete refresh state is not persisted."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    runtime._store.async_save = AsyncMock()
+
+    runtime.last_completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = "manual"
+    runtime.last_duration = 2.5
+
+    setattr(runtime, missing_field, None)
+
+    await runtime._async_save_last_refresh()
+
+    runtime._store.async_save.assert_not_awaited()
 
 
 async def test_refresh_succeeds_with_no_repositories(
