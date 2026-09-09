@@ -18,8 +18,14 @@ branch = true
 [tool.coverage.report]
 fail_under = 95
 
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+ignore_missing_imports = true
+
 [dependency-groups]
 dev = [
+    "mypy",
     "pytest",
     "pytest-cov",
     "pytest-homeassistant-custom-component",

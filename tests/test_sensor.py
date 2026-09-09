@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
@@ -72,11 +73,10 @@ def test_status_sensor_runtime_update_writes_state() -> None:
 
     sensor = HacsRefreshStatusSensor(runtime)
 
-    sensor.async_write_ha_state = MagicMock()
+    with patch.object(Entity, "async_write_ha_state") as mock_write_state:
+        sensor._async_runtime_updated()
 
-    sensor._async_runtime_updated()
-
-    sensor.async_write_ha_state.assert_called_once()
+    mock_write_state.assert_called_once_with()
 
 
 async def test_status_sensor_removes_runtime_listener_when_removed(

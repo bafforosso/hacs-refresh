@@ -55,20 +55,25 @@ async def test_refresh_service_triggers_manual_refresh(
     await async_setup(hass, {})
 
     runtime = MagicMock()
-    runtime.async_refresh = AsyncMock()
-
     config_entry = MagicMock()
     config_entry.runtime_data = runtime
 
-    hass.config_entries.async_loaded_entries = MagicMock(return_value=[config_entry])
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[config_entry],
+    ), patch.object(
+        runtime,
+        "async_refresh",
+        new_callable=AsyncMock,
+    ) as mock_refresh:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+        )
 
-    await hass.services.async_call(
-        DOMAIN,
-        SERVICE_REFRESH,
-        blocking=True,
-    )
-
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    mock_refresh.assert_awaited_once_with(source="manual")
 
 
 async def test_setup_entry_requires_hacs(
@@ -159,12 +164,15 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
         update_listener = add_update_listener.call_args.args[0]
 
         scheduler.async_setup.reset_mock()
-        config_entry.runtime_data.notify_listeners = MagicMock()
 
-        await update_listener(hass, config_entry)
+        with patch.object(
+            config_entry.runtime_data,
+            "notify_listeners",
+        ) as mock_notify_listeners:
+            await update_listener(hass, config_entry)
 
-    scheduler.async_setup.assert_awaited_once()
-    config_entry.runtime_data.notify_listeners.assert_called_once()
+        scheduler.async_setup.assert_awaited_once()
+        mock_notify_listeners.assert_called_once_with()
 
 
 async def test_unload_entry_unloads_platforms(

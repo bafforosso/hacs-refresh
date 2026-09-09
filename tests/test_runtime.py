@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -144,11 +144,12 @@ async def test_refresh_fails_when_hacs_is_unavailable(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=HacsUnavailableError,
-    )
-
-    with pytest.raises(HomeAssistantError) as exc_info:
+    ), pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -165,11 +166,12 @@ async def test_refresh_fails_when_hacs_is_disabled(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=HacsDisabledError,
-    )
-
-    with pytest.raises(HomeAssistantError) as exc_info:
+    ), pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -186,16 +188,18 @@ async def test_refresh_succeeds(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=1,
             successful=1,
         ),
-    )
+    ) as mock_refresh:
+        await runtime.async_refresh(source="manual")
 
-    await runtime.async_refresh(source="manual")
-
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
     assert runtime.state == "idle"
     assert runtime.last_completed is not None
@@ -231,11 +235,13 @@ async def test_refresh_duration_is_propagated_to_event(
     listener = MagicMock()
     runtime.add_event_listener(listener)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(duration=2.5),
-    )
-
-    await runtime.async_refresh(source="manual")
+    ):
+        await runtime.async_refresh(source="manual")
 
     listener.assert_called_once()
     assert listener.call_args.args[1]["duration"] == 2.5
@@ -293,11 +299,12 @@ async def test_refresh_fails_on_unexpected_error(
 
     unexpected_error = RuntimeError("Something went wrong")
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=unexpected_error,
-    )
-
-    with pytest.raises(HomeAssistantError) as exc_info:
+    ), pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -319,11 +326,13 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     runtime.add_event_listener(listener)
 
     unexpected_error = RuntimeError("Something went wrong")
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=unexpected_error,
-    )
-
-    await runtime.async_refresh(source="scheduled")
+    ):
+        await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_FAILED
@@ -346,11 +355,12 @@ async def test_manual_refresh_is_skipped_when_queue_is_running(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=HacsQueueRunningError,
-    )
-
-    with pytest.raises(HacsRefreshSkipped) as exc_info:
+    ), pytest.raises(HacsRefreshSkipped) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -401,13 +411,15 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
 
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         side_effect=HacsQueueRunningError,
-    )
+    ) as mock_refresh:
+        await runtime.async_refresh(source="scheduled")
 
-    await runtime.async_refresh(source="scheduled")
-
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
     assert runtime.state == "idle"
     assert (
@@ -424,15 +436,17 @@ async def test_scheduled_refresh_suppresses_refresh_error(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=1,
             successful=1,
             pending=1,
         ),
-    )
-
-    await runtime.async_refresh(source="scheduled")
+    ):
+        await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
     assert runtime.last_result == "partial"
@@ -449,29 +463,31 @@ async def test_scheduled_refresh_is_skipped_within_minimum_interval(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(),
-    )
+    ) as mock_refresh:
+        start = datetime(
+            2026,
+            1,
+            1,
+            2,
+            30,
+            tzinfo=UTC,
+        )
 
-    start = datetime(
-        2026,
-        1,
-        1,
-        2,
-        30,
-        tzinfo=UTC,
-    )
+        runtime.last_completed = start
 
-    runtime.last_completed = start
+        monkeypatch.setattr(
+            "custom_components.hacs_refresh.runtime.dt_util.now",
+            lambda: start + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
+        )
 
-    monkeypatch.setattr(
-        "custom_components.hacs_refresh.runtime.dt_util.now",
-        lambda: start + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
-    )
+        await runtime.async_refresh(source="scheduled")
 
-    await runtime.async_refresh(source="scheduled")
-
-    runtime.hacs.async_refresh.assert_not_awaited()
+    mock_refresh.assert_not_awaited()
 
 
 async def test_scheduled_refresh_is_allowed_at_minimum_interval(
@@ -482,29 +498,31 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(),
-    )
+    ) as mock_refresh:
+        start = datetime(
+            2026,
+            1,
+            1,
+            2,
+            30,
+            tzinfo=UTC,
+        )
 
-    start = datetime(
-        2026,
-        1,
-        1,
-        2,
-        30,
-        tzinfo=UTC,
-    )
+        runtime.last_completed = start
 
-    runtime.last_completed = start
+        monkeypatch.setattr(
+            "custom_components.hacs_refresh.runtime.dt_util.now",
+            lambda: start + MIN_REFRESH_INTERVAL,
+        )
 
-    monkeypatch.setattr(
-        "custom_components.hacs_refresh.runtime.dt_util.now",
-        lambda: start + MIN_REFRESH_INTERVAL,
-    )
+        await runtime.async_refresh(source="scheduled")
 
-    await runtime.async_refresh(source="scheduled")
-
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
 
 async def test_manual_refresh_bypasses_minimum_interval(
@@ -515,29 +533,32 @@ async def test_manual_refresh_bypasses_minimum_interval(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(),
-    )
+    ) as mock_refresh:
 
-    start = datetime(
-        2026,
-        1,
-        1,
-        2,
-        30,
-        tzinfo=UTC,
-    )
+        start = datetime(
+            2026,
+            1,
+            1,
+            2,
+            30,
+            tzinfo=UTC,
+        )
 
-    runtime.last_completed = start
+        runtime.last_completed = start
 
-    monkeypatch.setattr(
-        "custom_components.hacs_refresh.runtime.dt_util.now",
-        lambda: start + timedelta(minutes=1),
-    )
+        monkeypatch.setattr(
+            "custom_components.hacs_refresh.runtime.dt_util.now",
+            lambda: start + timedelta(minutes=1),
+        )
 
-    await runtime.async_refresh(source="manual")
+        await runtime.async_refresh(source="manual")
 
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
 
 async def test_scheduled_refresh_respects_last_completed(
@@ -548,33 +569,35 @@ async def test_scheduled_refresh_respects_last_completed(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=0,
             successful=0,
         ),
-    )
+    ) as mock_refresh:
+        last_completed = datetime(
+            2026,
+            1,
+            1,
+            2,
+            30,
+            tzinfo=UTC,
+        )
 
-    last_completed = datetime(
-        2026,
-        1,
-        1,
-        2,
-        30,
-        tzinfo=UTC,
-    )
+        runtime.last_completed = last_completed
 
-    runtime.last_completed = last_completed
+        monkeypatch.setattr(
+            "custom_components.hacs_refresh.runtime.dt_util.now",
+            lambda: last_completed + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
+        )
 
-    monkeypatch.setattr(
-        "custom_components.hacs_refresh.runtime.dt_util.now",
-        lambda: last_completed + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
-    )
-
-    await runtime.async_refresh(source="scheduled")
+        await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
-    runtime.hacs.async_refresh.assert_not_awaited()
+    mock_refresh.assert_not_awaited()
 
 
 async def test_scheduled_refresh_is_allowed_without_last_completed(
@@ -584,15 +607,17 @@ async def test_scheduled_refresh_is_allowed_without_last_completed(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(),
-    )
-
-    await runtime.async_refresh(source="scheduled")
+    ) as mock_refresh:
+        await runtime.async_refresh(source="scheduled")
 
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_SUCCESS
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
 
 @pytest.mark.parametrize(
@@ -611,26 +636,28 @@ async def test_last_refresh_is_not_saved_when_state_is_incomplete(
     """Test that incomplete refresh state is not persisted."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
-    runtime._store.async_save = AsyncMock()
+    with patch.object(
+        runtime._store,
+        "async_save",
+        new_callable=AsyncMock,
+    ) as mock_save:
+        runtime.last_completed = datetime(
+            2026,
+            1,
+            1,
+            2,
+            30,
+            tzinfo=UTC,
+        )
+        runtime.last_result = EVENT_TYPE_SUCCESS
+        runtime.last_source = "manual"
+        runtime.last_duration = 2.5
 
-    runtime.last_completed = datetime(
-        2026,
-        1,
-        1,
-        2,
-        30,
-        tzinfo=UTC,
-    )
-    runtime.last_result = EVENT_TYPE_SUCCESS
-    runtime.last_source = "manual"
-    runtime.last_duration = 2.5
+        setattr(runtime, missing_field, None)
 
-    setattr(runtime, missing_field, None)
+        await runtime._async_save_last_refresh()
 
-    await runtime._async_save_last_refresh()
-
-    runtime._store.async_save.assert_not_awaited()
-
+    mock_save.assert_not_awaited()
 
 async def test_refresh_succeeds_with_no_repositories(
     hass: HomeAssistant,
@@ -639,14 +666,16 @@ async def test_refresh_succeeds_with_no_repositories(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=0,
             successful=0,
         ),
-    )
-
-    await runtime.async_refresh(source="manual")
+    ) as mock_refresh:
+        await runtime.async_refresh(source="manual")
 
     assert runtime.state == "idle"
     assert runtime.last_result == "success"
@@ -657,7 +686,7 @@ async def test_refresh_succeeds_with_no_repositories(
     assert runtime.last_pending == 0
     assert runtime.last_error is None
 
-    runtime.hacs.async_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with()
 
 
 async def test_refresh_reports_pending_repositories(
@@ -667,15 +696,16 @@ async def test_refresh_reports_pending_repositories(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=1,
             successful=1,
             pending=1,
         ),
-    )
-
-    with pytest.raises(HomeAssistantError) as exc_info:
+    ), pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
@@ -701,16 +731,17 @@ async def test_refresh_reports_repository_failure(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    runtime.hacs.async_refresh = AsyncMock(
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
         return_value=_refresh_result(
             repositories=2,
             successful=1,
             failed=1,
             failures=("example/failed-repository: Something went wrong",),
         ),
-    )
-
-    with pytest.raises(HomeAssistantError) as exc_info:
+    ), pytest.raises(HomeAssistantError) as exc_info:
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
