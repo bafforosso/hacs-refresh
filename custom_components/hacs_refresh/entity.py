@@ -6,16 +6,16 @@ from homeassistant.helpers.device_registry import (
     DeviceEntryType,
     DeviceInfo,
 )
+from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
 from .runtime import HacsRefreshRuntimeData
 
 
-class HacsRefreshEntity:
+class HacsRefreshEntity(Entity):
     """Base entity for HACS Refresh."""
 
     _attr_has_entity_name = True
-    _attr_device_info: DeviceInfo | None
 
     def __init__(
         self,

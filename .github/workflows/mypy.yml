@@ -14,9 +14,27 @@ permissions:
   contents: read
 
 jobs:
-  mypy:
-    name: Mypy
+  current-stack:
+    name: MyPy - Python 3.14 / current HA (Locked)
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Check types
+        run: uv run --locked mypy custom_components/hacs_refresh tests
+
+  minimum-compatibility:
+    name: MyPy - Python 3.12 / HA 2024.12.0
+    runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -28,4 +46,13 @@ jobs:
           python-version: "3.12"
 
       - name: Check types
-        run: uv run --locked mypy custom_components/hacs_refresh tests
+        run: >
+          uv run
+          --no-project
+          --python 3.12
+          --with mypy
+          --with pytest-homeassistant-custom-component==0.13.190
+          mypy
+          --python-version 3.12
+          custom_components/hacs_refresh
+          tests
