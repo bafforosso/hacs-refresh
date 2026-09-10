@@ -6,7 +6,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
 ![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
 
-A Home Assistant custom integration that helps you keep your installed HACS repositories up to date with scheduled or on-demand refreshes.
+A Home Assistant custom component to help you keep your installed HACS repositories up to date with scheduled or on-demand refreshes.
 
 HACS normally checks for repository updates automatically, but detection of newly released versions can sometimes be delayed. HACS Refresh complements HACS by giving users more control over when installed repository data is refreshed, either automatically on a schedule or manually whenever needed.
 
@@ -30,7 +30,7 @@ HACS normally checks for repository updates automatically, but detection of newl
 
 ### HACS (recommended)
 
-HACS Refresh is currently installed as a custom repository.
+HACS Refresh is not currently available in the default repositories, it needs to be installed as a custom repository.
 
 1. Add the repository as a custom repository in HACS:
 
@@ -57,7 +57,7 @@ Alternatively, you can add the repository manually:
 
 ### Manual Installation
 
-1. Download the integration files from the GitHub repository.
+1. Download the files from the GitHub repository.
 2. Place the `custom_components/hacs_refresh` directory into your Home Assistant `custom_components` directory.
 3. Restart Home Assistant.
 4. Go to **Settings → Devices & services → Add integration**.
