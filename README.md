@@ -19,6 +19,7 @@ HACS normally checks for repository updates automatically, but detection of newl
 - **Refresh protection** — prevent scheduled refreshes from running too frequently.
 - **Refresh completed event** — report details of the last refresh and trigger automations when it completes.
 - **Status sensor** — monitor refresh state and schedule configuration.
+- **Diagnostics** — view configuration and runtime details for troubleshooting.
 
 ## Requirements
 

@@ -4,25 +4,6 @@ version = "1.0.0b0"
 requires-python = ">=3.12"
 dependencies = []
 
-[tool.uv]
-package = false
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests"]
-
-[tool.coverage.run]
-branch = true
-
-[tool.coverage.report]
-fail_under = 95
-
-[tool.mypy]
-python_version = "3.12"
-explicit_package_bases = true
-ignore_missing_imports = true
-
 [dependency-groups]
 dev = [
     "mypy",
@@ -32,3 +13,28 @@ dev = [
     "pytest-homeassistant-custom-component",
     "ruff>=0.16.6",
 ]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 95
+
+[tool.mypy]
+python_version = "3.14"
+explicit_package_bases = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.uv]
+package = false
+environments = [
+    "python_full_version >= '3.14.2' and python_full_version < '3.15'",
+]
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.14" }
