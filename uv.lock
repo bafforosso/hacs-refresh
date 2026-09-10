@@ -1531,7 +1531,7 @@ wheels = [
 
 [[package]]
 name = "hacs-refresh"
-version = "1.0.0b0"
+version = "1.0.0b1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
