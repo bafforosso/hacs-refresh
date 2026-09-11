@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -67,12 +67,7 @@ async def test_refresh_succeeds(
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
-
-    with patch(
-        "custom_components.hacs_refresh.hacs.perf_counter",
-        side_effect=[10.0, 12.5],
-    ):
-        result = await adapter.async_refresh()
+    result = await adapter.async_refresh()
 
     assert result == HacsRefreshResult(
         repositories=1,
@@ -80,7 +75,6 @@ async def test_refresh_succeeds(
         failed=0,
         pending=0,
         failures=(),
-        duration=2.5,
     )
 
     repository.update_repository.assert_awaited_once_with(
@@ -101,12 +95,7 @@ async def test_refresh_succeeds_with_no_repositories(
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
-
-    with patch(
-        "custom_components.hacs_refresh.hacs.perf_counter",
-        side_effect=[10.0, 12.5],
-    ):
-        result = await adapter.async_refresh()
+    result = await adapter.async_refresh()
 
     assert result == HacsRefreshResult(
         repositories=0,
@@ -114,7 +103,6 @@ async def test_refresh_succeeds_with_no_repositories(
         failed=0,
         pending=0,
         failures=(),
-        duration=2.5,
     )
 
     hacs.queue.add.assert_not_called()
@@ -140,12 +128,7 @@ async def test_refresh_reports_pending_repositories(
     hacs.async_process_queue = AsyncMock(side_effect=process_queue)
 
     adapter = HacsAdapter(hass)
-
-    with patch(
-        "custom_components.hacs_refresh.hacs.perf_counter",
-        side_effect=[10.0, 12.5],
-    ):
-        result = await adapter.async_refresh()
+    result = await adapter.async_refresh()
 
     assert result == HacsRefreshResult(
         repositories=1,
@@ -153,7 +136,6 @@ async def test_refresh_reports_pending_repositories(
         failed=0,
         pending=1,
         failures=(),
-        duration=2.5,
     )
 
     hacs.data.async_write.assert_awaited_once()
@@ -181,12 +163,7 @@ async def test_refresh_reports_repository_failure(
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
-
-    with patch(
-        "custom_components.hacs_refresh.hacs.perf_counter",
-        side_effect=[10.0, 12.5],
-    ):
-        result = await adapter.async_refresh()
+    result = await adapter.async_refresh()
 
     assert result == HacsRefreshResult(
         repositories=2,
@@ -194,7 +171,6 @@ async def test_refresh_reports_repository_failure(
         failed=1,
         pending=0,
         failures=("example/failed-repository: Something went wrong",),
-        duration=2.5,
     )
 
     successful_repository.update_repository.assert_awaited_once_with(
