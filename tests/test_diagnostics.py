@@ -112,16 +112,16 @@ async def test_diagnostics_runtime_state(
     }
 
 
-async def test_diagnostics_excludes_error(
+async def test_diagnostics_excludes_message(
     hass: HomeAssistant,
 ) -> None:
-    """Test diagnostics do not expose the runtime error."""
+    """Test diagnostics do not expose the runtime message."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
     entry.runtime_data = runtime
 
-    runtime.last_error = "sensitive or uncontrolled error information"
+    runtime.last_message = "sensitive or uncontrolled error information"
 
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
 
-    assert "last_error" not in diagnostics["runtime"]
+    assert "last_message" not in diagnostics["runtime"]

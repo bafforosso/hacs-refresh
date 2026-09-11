@@ -42,7 +42,6 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
     runtime.last_result = EVENT_TYPE_SUCCESS
     runtime.last_refresh = datetime(2026, 9, 4, 2, 30, tzinfo=UTC)
     runtime.last_source = "scheduled"
-    runtime.last_error = None
     runtime.last_repositories = 5
     runtime.last_successful = 5
     runtime.last_failed = 0

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from time import perf_counter
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -30,7 +29,6 @@ class HacsRefreshResult:
     failed: int
     pending: int
     failures: tuple[str, ...]
-    duration: float
 
 
 class HacsAdapter:
@@ -59,8 +57,6 @@ class HacsAdapter:
         if hacs.queue.running:
             raise HacsQueueRunningError
 
-        start = perf_counter()
-
         repositories = list(hacs.repositories.list_downloaded)
 
         if not repositories:
@@ -70,7 +66,6 @@ class HacsAdapter:
                 failed=0,
                 pending=0,
                 failures=(),
-                duration=perf_counter() - start,
             )
 
         successful = 0
@@ -117,5 +112,4 @@ class HacsAdapter:
             failed=len(failures),
             pending=pending,
             failures=tuple(failures),
-            duration=perf_counter() - start,
         )

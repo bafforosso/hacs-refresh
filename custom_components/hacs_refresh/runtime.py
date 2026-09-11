@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime
+from time import perf_counter
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -62,7 +63,7 @@ class HacsRefreshRuntimeData:
         self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
-        self.last_error: str | None = None
+        self.last_message: str | None = None
         self.last_duration: float | None = None
 
         self.last_repositories = 0
@@ -132,9 +133,10 @@ class HacsRefreshRuntimeData:
             "successful": self.last_successful,
             "failed": self.last_failed,
             "pending": self.last_pending,
-            "last_error": self.last_error,
             "duration": self.last_duration,
         }
+        if self.last_message is not None:
+            event_data["message"] = self.last_message
 
         for listener in tuple(self._event_listeners):
             listener(self.last_result, event_data)
@@ -175,22 +177,6 @@ class HacsRefreshRuntimeData:
                     _LOGGER.error("Scheduled HACS refresh failed")
                     return
                 raise
-            except Exception as err:
-                self.state = STATE_IDLE
-                self.last_result = EVENT_TYPE_FAILED
-                self.last_source = source
-                self.last_error = str(err)
-                self.notify_listeners()
-                self._notify_refresh_completed()
-
-                if source == REFRESH_SOURCE_SCHEDULED:
-                    _LOGGER.exception("Scheduled HACS refresh failed")
-                    return
-
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="unexpected_refresh_error",
-                ) from err
 
     async def _async_refresh(
         self,
@@ -213,15 +199,9 @@ class HacsRefreshRuntimeData:
             return
 
         self.state = STATE_REFRESHING
-        self.last_source = source
-        self.last_error = None
-        self.last_repositories = 0
-        self.last_successful = 0
-        self.last_failed = 0
-        self.last_pending = 0
-
         self.notify_listeners()
 
+        start = perf_counter()
         try:
             result = await self.hacs.async_refresh()
         except HacsUnavailableError as err:
@@ -253,8 +233,38 @@ class HacsRefreshRuntimeData:
                 translation_domain=DOMAIN,
                 translation_key="hacs_queue_running",
             ) from err
+        except Exception as err:
+            duration = perf_counter() - start
+            self.state = STATE_IDLE
+            self.last_completed = dt_util.now()
+            self.last_result = EVENT_TYPE_FAILED
+            self.last_source = source
+            self.last_message = str(err)
+            self.last_duration = duration
+            self.last_repositories = 0
+            self.last_successful = 0
+            self.last_failed = 0
+            self.last_pending = 0
+            await self._async_save_last_refresh()
+            self.notify_listeners()
+            self._notify_refresh_completed()
 
-        await self._update_refresh_result(result, source=source)
+            if source == REFRESH_SOURCE_SCHEDULED:
+                _LOGGER.exception("Scheduled HACS refresh failed")
+                return
+
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unexpected_refresh_error",
+            ) from err
+        else:
+            duration = perf_counter() - start
+
+        await self._update_refresh_result(
+            result,
+            source=source,
+            duration=duration,
+        )
 
     async def _async_save_last_refresh(self) -> None:
         """Persist the last completed refresh."""
@@ -283,6 +293,7 @@ class HacsRefreshRuntimeData:
         result: HacsRefreshResult,
         *,
         source: str,
+        duration: float,
     ) -> None:
         """Update runtime state from a HACS refresh result."""
         self.state = STATE_IDLE
@@ -292,19 +303,19 @@ class HacsRefreshRuntimeData:
         self.last_successful = result.successful
         self.last_failed = result.failed
         self.last_pending = result.pending
-        self.last_duration = result.duration
+        self.last_duration = duration
 
         if result.pending:
             self.last_result = EVENT_TYPE_PARTIAL
-            self.last_error = (
+            self.last_message = (
                 f"{result.pending} repository refresh task(s) remain pending"
             )
         elif result.failed:
             self.last_result = EVENT_TYPE_FAILED
-            self.last_error = f"{result.failed} repository refresh task(s) failed"
+            self.last_message = f"{result.failed} repository refresh task(s) failed"
         else:
             self.last_result = EVENT_TYPE_SUCCESS
-            self.last_error = None
+            self.last_message = None
 
         await self._async_save_last_refresh()
 

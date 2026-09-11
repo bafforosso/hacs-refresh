@@ -30,7 +30,7 @@ HACS normally checks for repository updates automatically, but detection of newl
 
 ### HACS (recommended)
 
-HACS Refresh is not currently available in the default repositories, it needs to be installed as a custom repository.
+HACS Refresh is not currently available in the default repositories and needs to be installed as a custom repository.
 
 1. Add the repository as a custom repository in HACS:
 
@@ -73,6 +73,8 @@ HACS Refresh lets you control when automatic refreshes run.
 
 Refresh times must use the `HH:MM` format and be separated by commas. For example: `03:00, 15:00`
 
+<sub>*When automatic refresh is enabled, at least one day and one time must be configured. Up to 10 refresh times can be configured, and each refresh time must be at least 10 minutes apart.*</sub>
+
 ## Manual Refresh
 
 A manual refresh can be triggered using the **Refresh** button.
@@ -90,19 +92,21 @@ The integration creates:
 
 `sensor.hacs_refresh_status`
 
-The sensor **state** shows whether a refresh is currently running:
+Its `state` shows whether a refresh is currently running:
 
-- `idle` — no refresh is currently running.
-- `refreshing` — a refresh is currently in progress.
-
-The sensor's **attributes** provide details about the configured automatic refresh schedule:
-
-| Attribute | Description |
+| State | Description |
 | --- | --- |
-| `automatic_refresh` | Whether automatic refresh is enabled. |
-| `schedule_days` | Days configured for automatic refreshes. |
-| `schedule_times` | Times configured for automatic refreshes. |
-| `next_refresh` | Date and time of the next scheduled automatic refresh, or `null` when automatic refresh is disabled. |
+| `idle` | No refresh is currently running. |
+| `refreshing` | A refresh is currently in progress. |
+
+Its `attributes` provide details about the configured automatic refresh schedule:
+
+| Attribute | Type | Values / Format | Description |
+| --- | --- | --- | --- |
+| `automatic_refresh` | boolean | `true` / `false` | Whether automatic refresh is enabled. |
+| `schedule_days` | list of strings | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
+| `schedule_times` | list of strings | `HH:MM` | Times configured for automatic refreshes. |
+| `next_refresh` | string \| `null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
 
 ## Refresh Completed Event
 
@@ -110,16 +114,32 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever an actual refresh attempt completes and can be used in automations or other Home Assistant features or for monitoring.
-Its state contains the timestamp of the most recent completed refresh, while the event data provides details about that refresh.
+The event fires whenever a refresh attempt completes and can be used in automations or other Home Assistant features for monitoring or follow-up actions.
 
-| Data | Description |
+Its `state` is the timestamp of the most recent completed refresh:
+
+| Type | Format | Description |
+| --- | --- | --- |
+| string | ISO 8601 datetime | Timestamp of the most recent completed refresh. |
+
+The refresh result is reported by `event_type`:
+
+| Event type | Description |
 | --- | --- |
-| `event_type` | Result of the refresh: `success`, `partial`, or `failed`. |
-| `source` | What triggered the refresh, such as `scheduled` or `manual`. |
-| `duration` | Duration of the refresh in seconds. |
-| `repositories` | Total number of repositories included in the refresh. |
-| `successful` | Number of repositories refreshed successfully. |
-| `failed` | Number of repositories that failed to refresh. |
-| `pending` | Number of repositories that remain pending. |
-| `last_error` | Error message from the refresh, or `null` if there was no error. |
+| `success` | The refresh completed successfully. |
+| `partial` | The refresh completed with repositories still pending. |
+| `failed` | The refresh completed with one or more repository refreshes failing. |
+
+Its `attributes` provide further details about the refresh:
+
+| Attribute | Type | Presence | Values / Format | Description |
+| --- | --- | --- | --- | --- |
+| `source` | string | Always | `scheduled`, `manual` | What triggered the refresh. |
+| `duration` | number \| `null` | Always | Seconds | Duration associated with the refresh. |
+| `repositories` | integer | Always | ≥ 0 | Total number of repositories included in the refresh. |
+| `successful` | integer | Always | ≥ 0 | Number of repositories refreshed successfully. |
+| `failed` | integer | Always | ≥ 0 | Number of repositories that failed to refresh. |
+| `pending` | integer | Always | ≥ 0 | Number of repositories that remain pending. |
+| `message` | string | Conditional | Human-readable text | Refresh issue or error. |
+
+The `message` field is included when the refresh produces a message and omitted otherwise.
