@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.hacs_refresh.const import (
     DOMAIN,
     EVENT_TYPE_FAILED,
+    EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
 )
@@ -216,7 +217,7 @@ async def test_refresh_succeeds(
     assert runtime.last_failed == 0
     assert runtime.last_pending == 0
     assert runtime.last_duration == 2.5
-    assert runtime.last_error is None
+    assert runtime.last_message is None
 
     stored = await runtime._store.async_load()
 
@@ -253,6 +254,58 @@ async def test_refresh_duration_is_propagated_to_event(
     assert listener.call_args.args[1]["duration"] == 2.5
 
 
+@pytest.mark.parametrize(
+    ("refresh_result", "event_type", "message"),
+    [
+        (
+            _refresh_result(
+                repositories=1,
+                successful=1,
+                pending=1,
+            ),
+            EVENT_TYPE_PARTIAL,
+            "1 repository refresh task(s) remain pending",
+        ),
+        (
+            _refresh_result(
+                repositories=2,
+                successful=1,
+                failed=1,
+                failures=("example/failed-repository: Something went wrong",),
+            ),
+            EVENT_TYPE_FAILED,
+            "1 repository refresh task(s) failed",
+        ),
+    ],
+)
+async def test_refresh_result_message_is_propagated_to_event(
+    hass: HomeAssistant,
+    refresh_result: HacsRefreshResult,
+    event_type: str,
+    message: str,
+) -> None:
+    """Test that partial and failed refresh messages are included in the event."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+    runtime.add_event_listener(listener)
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=refresh_result,
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
+        await runtime.async_refresh(source="manual")
+
+    listener.assert_called_once()
+    assert listener.call_args.args[0] == event_type
+    assert listener.call_args.args[1]["message"] == message
+
+
 def test_runtime_event_listener_can_be_added_and_removed(
     hass: HomeAssistant,
 ) -> None:
@@ -272,7 +325,6 @@ def test_runtime_event_listener_can_be_added_and_removed(
     runtime.last_successful = 1
     runtime.last_failed = 0
     runtime.last_pending = 0
-    runtime.last_error = None
     runtime.last_duration = 2.5
 
     runtime._notify_refresh_completed()
@@ -285,7 +337,6 @@ def test_runtime_event_listener_can_be_added_and_removed(
             "successful": 1,
             "failed": 0,
             "pending": 0,
-            "last_error": None,
             "duration": 2.5,
         },
     )
@@ -346,12 +397,12 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_FAILED
     assert runtime.last_source == "scheduled"
-    assert runtime.last_error == "Something went wrong"
+    assert runtime.last_message == "Something went wrong"
 
     listener.assert_called_once()
     assert listener.call_args.args[0] == EVENT_TYPE_FAILED
     assert listener.call_args.args[1]["source"] == "scheduled"
-    assert listener.call_args.args[1]["last_error"] == "Something went wrong"
+    assert listener.call_args.args[1]["message"] == "Something went wrong"
 
     assert "Scheduled HACS refresh failed" in caplog.text
 
@@ -696,7 +747,7 @@ async def test_refresh_succeeds_with_no_repositories(
     assert runtime.last_successful == 0
     assert runtime.last_failed == 0
     assert runtime.last_pending == 0
-    assert runtime.last_error is None
+    assert runtime.last_message is None
 
     mock_refresh.assert_awaited_once_with()
 
@@ -736,7 +787,7 @@ async def test_refresh_reports_pending_repositories(
     assert runtime.last_successful == 1
     assert runtime.last_failed == 0
     assert runtime.last_pending == 1
-    assert runtime.last_error == "1 repository refresh task(s) remain pending"
+    assert runtime.last_message == "1 repository refresh task(s) remain pending"
 
 
 async def test_refresh_reports_repository_failure(
@@ -776,4 +827,4 @@ async def test_refresh_reports_repository_failure(
     assert runtime.last_successful == 1
     assert runtime.last_failed == 1
     assert runtime.last_pending == 0
-    assert runtime.last_error == "1 repository refresh task(s) failed"
+    assert runtime.last_message == "1 repository refresh task(s) failed"

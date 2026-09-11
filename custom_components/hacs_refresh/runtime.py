@@ -62,7 +62,7 @@ class HacsRefreshRuntimeData:
         self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
-        self.last_error: str | None = None
+        self.last_message: str | None = None
         self.last_duration: float | None = None
 
         self.last_repositories = 0
@@ -132,9 +132,10 @@ class HacsRefreshRuntimeData:
             "successful": self.last_successful,
             "failed": self.last_failed,
             "pending": self.last_pending,
-            "last_error": self.last_error,
             "duration": self.last_duration,
         }
+        if self.last_message is not None:
+            event_data["message"] = self.last_message
 
         for listener in tuple(self._event_listeners):
             listener(self.last_result, event_data)
@@ -179,7 +180,7 @@ class HacsRefreshRuntimeData:
                 self.state = STATE_IDLE
                 self.last_result = EVENT_TYPE_FAILED
                 self.last_source = source
-                self.last_error = str(err)
+                self.last_message = str(err)
                 self.notify_listeners()
                 self._notify_refresh_completed()
 
@@ -214,7 +215,7 @@ class HacsRefreshRuntimeData:
 
         self.state = STATE_REFRESHING
         self.last_source = source
-        self.last_error = None
+        self.last_message = None
         self.last_repositories = 0
         self.last_successful = 0
         self.last_failed = 0
@@ -296,15 +297,15 @@ class HacsRefreshRuntimeData:
 
         if result.pending:
             self.last_result = EVENT_TYPE_PARTIAL
-            self.last_error = (
+            self.last_message = (
                 f"{result.pending} repository refresh task(s) remain pending"
             )
         elif result.failed:
             self.last_result = EVENT_TYPE_FAILED
-            self.last_error = f"{result.failed} repository refresh task(s) failed"
+            self.last_message = f"{result.failed} repository refresh task(s) failed"
         else:
             self.last_result = EVENT_TYPE_SUCCESS
-            self.last_error = None
+            self.last_message = None
 
         await self._async_save_last_refresh()
 

@@ -43,7 +43,6 @@ def test_refresh_completed_event_triggers_event() -> None:
             "successful": 5,
             "failed": 0,
             "pending": 0,
-            "last_error": None,
         }
         event._async_refresh_completed(
             EVENT_TYPE_SUCCESS,

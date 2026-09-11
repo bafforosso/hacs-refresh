@@ -122,4 +122,4 @@ Its state contains the timestamp of the most recent completed refresh, while the
 | `successful` | Number of repositories refreshed successfully. |
 | `failed` | Number of repositories that failed to refresh. |
 | `pending` | Number of repositories that remain pending. |
-| `last_error` | Error message from the refresh, or `null` if there was no error. |
+| `message` | Human-readable message describing a partial or failed refresh. |
