@@ -1,6 +1,6 @@
 [project]
 name = "hacs-refresh"
-version = "1.0.0b2"
+version = "1.0.0"
 requires-python = ">=3.12"
 dependencies = []
 
