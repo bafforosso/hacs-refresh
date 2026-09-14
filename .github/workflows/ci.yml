@@ -63,4 +63,4 @@ jobs:
           python-version: "3.12"
 
       - name: Run tests
-        run: uv run --no-project --python 3.12 --with pytest --with pytest-homeassistant-custom-component==0.13.190 pytest
+        run: uv run --isolated --no-project --python 3.12 --with pytest --with pytest-homeassistant-custom-component==0.13.190 pytest
