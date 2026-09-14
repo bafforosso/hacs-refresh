@@ -1,0 +1,59 @@
+name: Test upcoming Home Assistant
+
+on:
+  schedule:
+    - cron: "0 12 * * 4"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Pytest - Python 3.14 / upcoming HA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Check Home Assistant version
+        id: home-assistant
+        run: |
+          version="$(
+            uv run --no-project \
+              --python 3.14 \
+              --with pytest \
+              --with pytest-homeassistant-custom-component \
+              --refresh-package pytest-homeassistant-custom-component \
+              python -c 'import homeassistant; print(homeassistant.__version__)'
+          )"
+
+          echo "Home Assistant version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests against Home Assistant beta
+        if: contains(steps.home-assistant.outputs.version, 'b')
+        run: |
+          uv run --no-project \
+            --python 3.14 \
+            --with pytest \
+            --with pytest-homeassistant-custom-component \
+            --refresh-package pytest-homeassistant-custom-component \
+            pytest
+
+      - name: No Home Assistant beta available
+        if: "!contains(steps.home-assistant.outputs.version, 'b')"
+        run: |
+          echo "Home Assistant ${{ steps.home-assistant.outputs.version }} is not a beta."
+          echo "No upcoming release test is required this week."
