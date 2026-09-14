@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration",
+        "description": "HACS Refresh vous permet de planifier ou de déclencher manuellement l’actualisation de tous les dépôts HACS installés.",
+        "data": {
+          "automatic_refresh": "Activer l’actualisation automatique",
+          "days": "Jours de la semaine",
+          "times": "Heures d’actualisation"
+        },
+        "data_description": {
+          "automatic_refresh": "Lorsqu’elle est activée, HACS Refresh s’exécute automatiquement selon les jours et heures sélectionnés.",
+          "days": "Sélectionnez les jours où effectuer les actualisations automatiques.",
+          "times": "Saisissez une ou plusieurs heures au format HH:MM, séparées par des virgules. Exemple : 03:00, 15:00."
+        }
+      }
+    },
+    "error": {
+      "invalid_time": "Saisissez des heures valides au format HH:MM.",
+      "no_times": "Au moins une heure d’actualisation est requise.",
+      "no_days": "Sélectionnez au moins un jour.",
+      "too_many_times": "Vous pouvez configurer jusqu’à 10 heures d’actualisation.",
+      "times_too_close": "Les heures d’actualisation doivent être espacées d’au moins 10 minutes."
+    }
+  },
+  "device": {
+    "hacs_refresh": {
+      "name": "HACS Refresh"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Actualiser"
+      }
+    },
+    "event": {
+      "refresh_completed": {
+        "name": "Actualisation terminée"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "État",
+        "state": {
+          "idle": "Inactif",
+          "refreshing": "Actualisation en cours"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "hacs_disabled": {
+      "message": "HACS est désactivé."
+    },
+    "hacs_queue_running": {
+      "message": "La file d’attente d’HACS est déjà en cours d’exécution."
+    },
+    "hacs_unavailable": {
+      "message": "HACS n’est pas disponible."
+    },
+    "refresh_in_progress": {
+      "message": "Une actualisation d’HACS est déjà en cours."
+    },
+    "refresh_tasks_failed": {
+      "message": "{failed} des {repositories} actualisations de dépôts HACS ont échoué."
+    },
+    "refresh_tasks_pending": {
+      "message": "Il reste {pending} tâche(s) d’actualisation d’HACS en attente."
+    },
+    "service_not_loaded": {
+      "message": "HACS Refresh n’est pas configuré ou chargé."
+    },
+    "unexpected_refresh_error": {
+      "message": "Erreur inattendue lors de l’actualisation des dépôts HACS."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configuration",
+        "description": "Configurez les actualisations automatiques de tous les dépôts HACS installés. Les actualisations manuelles sont toujours disponibles via l’action Actualiser HACS.",
+        "data": {
+          "automatic_refresh": "Activer l’actualisation automatique",
+          "days": "Jours de la semaine",
+          "times": "Heures d’actualisation"
+        },
+        "data_description": {
+          "automatic_refresh": "Lorsqu’elle est activée, HACS Refresh s’exécute automatiquement selon les jours et heures sélectionnés.",
+          "days": "Sélectionnez les jours où effectuer les actualisations automatiques.",
+          "times": "Saisissez une ou plusieurs heures au format HH:MM, séparées par des virgules. Exemple : 03:00, 15:00."
+        }
+      }
+    },
+    "error": {
+      "invalid_time": "Saisissez des heures valides au format HH:MM.",
+      "no_times": "Au moins une heure d’actualisation est requise.",
+      "no_days": "Sélectionnez au moins un jour.",
+      "too_many_times": "Vous pouvez configurer jusqu’à 10 heures d’actualisation.",
+      "times_too_close": "Les heures d’actualisation doivent être espacées d’au moins 10 minutes."
+    }
+  },
+  "selector": {
+    "weekday": {
+      "options": {
+        "mon": "Lundi",
+        "tue": "Mardi",
+        "wed": "Mercredi",
+        "thu": "Jeudi",
+        "fri": "Vendredi",
+        "sat": "Samedi",
+        "sun": "Dimanche"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Actualiser les dépôts HACS",
+      "description": "Force l’actualisation de tous les dépôts HACS installés."
+    }
+  }
+}
