@@ -31,12 +31,11 @@ jobs:
         id: home-assistant
         run: |
           version="$(
-            uv run --no-project \
+            uv run --isolated --no-project \
               --python 3.14 \
               --with pytest \
               --with pytest-homeassistant-custom-component \
-              --refresh-package pytest-homeassistant-custom-component \
-              python -c 'import homeassistant; print(homeassistant.__version__)'
+              python -c 'from importlib.metadata import version; print(version("homeassistant"))'
           )"
 
           echo "Home Assistant version: $version"
@@ -45,11 +44,10 @@ jobs:
       - name: Run tests against Home Assistant beta
         if: contains(steps.home-assistant.outputs.version, 'b')
         run: |
-          uv run --no-project \
+          uv run --isolated --no-project \
             --python 3.14 \
             --with pytest \
             --with pytest-homeassistant-custom-component \
-            --refresh-package pytest-homeassistant-custom-component \
             pytest
 
       - name: No Home Assistant beta available
