@@ -92,6 +92,7 @@ class HacsRefreshRuntimeData:
             self.last_completed = completed
         self.last_result = data["result"]
         self.last_source = data["source"]
+        self.last_message = data.get("message")
         self.last_duration = data["duration"]
         self.last_repositories = data["repositories"]
         self.last_successful = data["successful"]
@@ -280,6 +281,7 @@ class HacsRefreshRuntimeData:
             "completed": self.last_completed.isoformat(),
             "result": self.last_result,
             "source": self.last_source,
+            "message": self.last_message,
             "duration": self.last_duration,
             "repositories": self.last_repositories,
             "successful": self.last_successful,
