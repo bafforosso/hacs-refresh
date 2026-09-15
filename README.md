@@ -1,10 +1,10 @@
 # HACS Refresh
 
-[![Made for Home Assistant](https://img.shields.io/badge/Made_for-Homeassistant-blue?style=flat&logo=homeassistant&logoColor=FFFFFF)](https://www.home-assistant.io/)
+[![Made for Home Assistant](https://img.shields.io/badge/Made_for-Home_Assistant-blue?style=flat&logo=homeassistant&logoColor=FFFFFF)](https://www.home-assistant.io/)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange?style=flat&logo=homeassistantcommunitystore&logoColor=FFFFFF)](https://hacs.xyz/)
 [![Tests](https://img.shields.io/github/actions/workflow/status/bafforosso/hacs-refresh/ci.yml?branch=main&style=flat&label=Tests)](https://github.com/bafforosso/hacs-refresh/actions/workflows/ci.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
-![GitHub License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat)
+[![Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&label=Release&color=blueviolet&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
+![License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat&label=License&color=yellow)
 
 A Home Assistant custom component to help you keep your installed HACS repositories up to date with scheduled or on-demand refreshes.
 

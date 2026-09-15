@@ -63,8 +63,9 @@ async def test_runtime_restores_last_completed_state(
     await runtime._store.async_save(
         {
             "completed": completed.isoformat(),
-            "result": "success",
+            "result": "failed",
             "source": "scheduled",
+            "message": "1 repository refresh task(s) failed",
             "duration": 2.5,
             "repositories": 5,
             "successful": 5,
@@ -76,8 +77,53 @@ async def test_runtime_restores_last_completed_state(
     await runtime.async_initialize()
 
     assert runtime.last_completed == completed
+    assert runtime.last_result == "failed"
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_message == "1 repository refresh task(s) failed"
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 5
+    assert runtime.last_successful == 5
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
+
+
+async def test_runtime_restores_legacy_refresh_state_without_message(
+    hass: HomeAssistant,
+) -> None:
+    """Test that runtime restores legacy refresh state without a message."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+
+    with patch.object(
+        runtime._store,
+        "async_load",
+        new_callable=AsyncMock,
+        return_value={
+            "completed": completed.isoformat(),
+            "result": "success",
+            "source": "scheduled",
+            "duration": 2.5,
+            "repositories": 5,
+            "successful": 5,
+            "failed": 0,
+            "pending": 0,
+        },
+    ):
+        await runtime.async_initialize()
+
+    assert runtime.last_completed == completed
     assert runtime.last_result == "success"
     assert runtime.last_source == "scheduled"
+    assert runtime.last_message is None
     assert runtime.last_duration == 2.5
     assert runtime.last_repositories == 5
     assert runtime.last_successful == 5
@@ -97,6 +143,7 @@ async def test_runtime_ignores_invalid_last_completed_timestamp(
             "completed": "not-a-datetime",
             "result": "success",
             "source": "scheduled",
+            "message": None,
             "duration": 2.5,
             "repositories": 5,
             "successful": 5,
@@ -230,6 +277,7 @@ async def test_refresh_succeeds(
     assert stored["completed"] == runtime.last_completed.isoformat()
     assert stored["result"] == "success"
     assert stored["source"] == "manual"
+    assert stored["message"] is None
     assert stored["duration"] == 2.5
     assert stored["repositories"] == 1
     assert stored["successful"] == 1
@@ -427,6 +475,7 @@ async def test_refresh_fails_on_unexpected_error(
     assert stored["completed"] == runtime.last_completed.isoformat()
     assert stored["result"] == EVENT_TYPE_FAILED
     assert stored["source"] == "manual"
+    assert stored["message"] == "Something went wrong"
     assert stored["duration"] == 2.5
     assert stored["repositories"] == 0
     assert stored["successful"] == 0

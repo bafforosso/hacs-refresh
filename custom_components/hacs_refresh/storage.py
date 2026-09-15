@@ -20,6 +20,7 @@ class LastRefreshData(TypedDict):
     completed: str
     result: str
     source: str
+    message: str | None
     duration: float
     repositories: int
     successful: int
