@@ -119,7 +119,9 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever a refresh attempt completes and can be used in automations or other Home Assistant features for monitoring or follow-up actions.
+The event is triggered when a refresh completes with a recorded result and can be used in automations or other Home Assistant features for monitoring or follow-up actions.
+
+The event is not triggered when a scheduled refresh is skipped before it starts, or when a refresh is cancelled.
 
 Its `state` is the timestamp of the most recent completed refresh:
 
@@ -131,9 +133,9 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | The refresh completed successfully. |
-| `partial` | The refresh completed with repositories still pending. |
-| `failed` | The refresh completed with one or more repository refreshes failing. |
+| `success` | The refresh completed successfully for all repositories. |
+| `partial` | The refresh completed with one or more repositories still pending. |
+| `failed` | The refresh completed with one or more repositories failing to refresh. |
 
 Its `attributes` provide further details about the refresh:
 
