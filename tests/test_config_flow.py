@@ -8,11 +8,7 @@ from homeassistant.helpers.schema_config_entry_flow import (
     SchemaConfigFlowHandler,
     SchemaFlowError,
 )
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    MockModule,
-    mock_integration,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.config_flow import (
     _options_schema,
@@ -32,16 +28,6 @@ from custom_components.hacs_refresh.const import (
     DOMAIN,
     MAX_TIMES,
 )
-
-
-@pytest.fixture
-def mock_hacs_integration(hass: HomeAssistant) -> None:
-    """Mock the HACS integration dependency."""
-    mock_integration(
-        hass,
-        MockModule("hacs"),
-        built_in=False,
-    )
 
 
 def test_parse_times_normalizes_and_sorts() -> None:

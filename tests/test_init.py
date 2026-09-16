@@ -10,11 +10,7 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
 )
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    MockModule,
-    mock_integration,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh import (
     PLATFORMS,
@@ -30,16 +26,6 @@ from custom_components.hacs_refresh.const import (
     SERVICE_REFRESH,
 )
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
-
-
-@pytest.fixture
-def mock_hacs_integration(hass: HomeAssistant) -> None:
-    """Mock the HACS integration dependency."""
-    mock_integration(
-        hass,
-        MockModule("hacs"),
-        built_in=False,
-    )
 
 
 def test_platforms() -> None:
