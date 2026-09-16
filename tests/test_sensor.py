@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from homeassistant.core import HomeAssistant
@@ -8,7 +7,6 @@ from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
-    EVENT_TYPE_SUCCESS,
 )
 from custom_components.hacs_refresh.sensor import (
     HacsRefreshStatusSensor,
@@ -68,15 +66,6 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
     freezer.move_to("2026-09-04 10:00:00+00:00")
 
     runtime = MagicMock()
-
-    runtime.state = "idle"
-    runtime.last_result = EVENT_TYPE_SUCCESS
-    runtime.last_refresh = datetime(2026, 9, 4, 2, 30, tzinfo=UTC)
-    runtime.last_source = "scheduled"
-    runtime.last_repositories = 5
-    runtime.last_successful = 5
-    runtime.last_failed = 0
-    runtime.last_pending = 0
     runtime.options = {
         CONF_AUTOMATIC_REFRESH: True,
         CONF_DAYS: ["mon", "wed", "fri"],
@@ -84,7 +73,6 @@ def test_status_sensor_extra_state_attributes(freezer) -> None:
     }
 
     sensor = HacsRefreshStatusSensor(runtime)
-
     attributes = sensor.extra_state_attributes
 
     assert attributes == {
