@@ -1,9 +1,17 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import SOURCE_USER
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaConfigFlowHandler,
     SchemaFlowError,
+)
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    MockModule,
+    mock_integration,
 )
 
 from custom_components.hacs_refresh.config_flow import (
@@ -12,6 +20,7 @@ from custom_components.hacs_refresh.config_flow import (
     _sort_days,
     _suggested_values,
     _validate_options,
+    _validate_refresh_intervals,
 )
 from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
@@ -20,8 +29,19 @@ from custom_components.hacs_refresh.const import (
     DEFAULT_AUTOMATIC_REFRESH,
     DEFAULT_DAYS,
     DEFAULT_TIMES,
+    DOMAIN,
     MAX_TIMES,
 )
+
+
+@pytest.fixture
+def mock_hacs_integration(hass: HomeAssistant) -> None:
+    """Mock the HACS integration dependency."""
+    mock_integration(
+        hass,
+        MockModule("hacs"),
+        built_in=False,
+    )
 
 
 def test_parse_times_normalizes_and_sorts() -> None:
@@ -47,6 +67,12 @@ def test_parse_times_rejects_invalid_times(value: str) -> None:
     """Test that invalid time values raise ValueError."""
     with pytest.raises(ValueError):
         _parse_times(value)
+
+
+def test_parse_times_rejects_non_string() -> None:
+    """Test that non-string values are rejected."""
+    with pytest.raises(TypeError):
+        _parse_times(None)  # type: ignore[arg-type]
 
 
 def test_sort_days_returns_monday_to_sunday_order() -> None:
@@ -270,10 +296,6 @@ def test_validate_refresh_intervals(
     valid: bool,
 ) -> None:
     """Test minimum intervals between configured refresh times."""
-    from custom_components.hacs_refresh.config_flow import (
-        _validate_refresh_intervals,
-    )
-
     if valid:
         _validate_refresh_intervals(times)
     else:
@@ -385,12 +407,225 @@ async def test_options_schema_uses_existing_options() -> None:
     }
 
 
-def test_config_flow_can_be_initialized() -> None:
-    """Test that the HACS Refresh config flow can be initialized."""
-    from custom_components.hacs_refresh.config_flow import (
-        HacsRefreshConfigFlow,
+async def test_user_flow(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+) -> None:
+    """Test the user config flow."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_USER},
     )
 
-    flow = HacsRefreshConfigFlow()
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
+    assert result.get("errors") is None
 
-    assert flow.async_config_entry_title({}) == "HACS Refresh"
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["sun", "mon", "wed"],
+        CONF_TIMES: "15:30, 03:00, 15:30",
+    }
+
+    with patch(
+        "custom_components.hacs_refresh.async_setup_entry",
+        new=AsyncMock(return_value=True),
+    ) as mock_setup_entry:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input,
+        )
+        await hass.async_block_till_done()
+
+    assert result.get("type") is FlowResultType.CREATE_ENTRY
+    assert result.get("title") == "HACS Refresh"
+    assert result.get("data") == {}
+    assert result.get("options") == {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon", "wed", "sun"],
+        CONF_TIMES: ["03:00", "15:30"],
+    }
+
+    assert mock_setup_entry.await_count == 1
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    assert len(entries) == 1
+    assert entries[0].options == result.get("options")
+
+
+async def test_user_flow_recovers_from_validation_error(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+) -> None:
+    """Test that the user flow recovers from invalid input."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_USER},
+    )
+
+    invalid_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: [],
+        CONF_TIMES: "03:00",
+    }
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        invalid_input,
+    )
+
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
+    assert result.get("errors") == {"base": "no_days"}
+
+    valid_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon"],
+        CONF_TIMES: "03:00",
+    }
+
+    with patch(
+        "custom_components.hacs_refresh.async_setup_entry",
+        new=AsyncMock(return_value=True),
+    ) as mock_setup_entry:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            valid_input,
+        )
+        await hass.async_block_till_done()
+
+    assert result.get("type") is FlowResultType.CREATE_ENTRY
+    assert result.get("title") == "HACS Refresh"
+    assert result.get("data") == {}
+    assert result.get("options") == {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon"],
+        CONF_TIMES: ["03:00"],
+    }
+
+    assert mock_setup_entry.await_count == 1
+
+
+async def test_user_flow_rejects_second_config_entry(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+) -> None:
+    """Test that only one config entry can be configured."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={
+            CONF_AUTOMATIC_REFRESH: False,
+            CONF_DAYS: [],
+            CONF_TIMES: [],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_USER},
+    )
+
+    assert result.get("type") is FlowResultType.ABORT
+    assert result.get("reason") == "single_instance_allowed"
+
+
+async def test_options_flow(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+) -> None:
+    """Test the options flow."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["mon", "fri"],
+            CONF_TIMES: ["03:00", "15:30"],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "init"
+    assert result.get("errors") is None
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["sun", "tue"],
+        CONF_TIMES: "18:00, 06:00",
+    }
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input,
+    )
+
+    assert result.get("type") is FlowResultType.CREATE_ENTRY
+    assert result.get("data") == {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["tue", "sun"],
+        CONF_TIMES: ["06:00", "18:00"],
+    }
+    assert entry.options == result.get("data")
+
+
+async def test_options_flow_recovers_from_validation_error(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+) -> None:
+    """Test that the options flow recovers from invalid input."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["mon"],
+            CONF_TIMES: ["03:00"],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    invalid_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: [],
+        CONF_TIMES: "03:00",
+    }
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        invalid_input,
+    )
+
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "init"
+    assert result.get("errors") == {"base": "no_days"}
+
+    valid_input = {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: [],
+        CONF_TIMES: "",
+    }
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        valid_input,
+    )
+
+    assert result.get("type") is FlowResultType.CREATE_ENTRY
+    assert result.get("data") == {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: [],
+        CONF_TIMES: [],
+    }
+    assert entry.options == result.get("data")
