@@ -24,6 +24,7 @@ from custom_components.hacs_refresh.runtime import (
     HacsRefreshRuntimeData,
     HacsRefreshSkipped,
 )
+from custom_components.hacs_refresh.storage import LastRefreshData
 
 
 def _refresh_result(
@@ -381,6 +382,72 @@ async def test_refresh_handles_cancellation(
     assert runtime.last_successful == 5
     assert runtime.last_failed == 0
     assert runtime.last_pending == 0
+
+
+async def test_refresh_handles_cancellation_during_persistence(
+    hass: HomeAssistant,
+) -> None:
+    """Test that cancelling during persistence still completes the save."""
+    entry = MockConfigEntry(domain=DOMAIN)
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    save_started = asyncio.Event()
+    release_save = asyncio.Event()
+
+    original_save = runtime._store.async_save
+
+    async def async_save(data: LastRefreshData) -> None:
+        save_started.set()
+        await release_save.wait()
+        await original_save(data)
+
+    event_listener = MagicMock()
+    runtime.add_event_listener(event_listener)
+
+    with (
+        patch.object(runtime._store, "async_save", new=async_save),
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(
+                repositories=1,
+                successful=1,
+            ),
+        ),
+    ):
+        refresh_task = asyncio.create_task(runtime.async_refresh(source="manual"))
+
+        await save_started.wait()
+
+        assert runtime.state == "idle"
+        assert runtime.last_result == EVENT_TYPE_SUCCESS
+        assert runtime.refresh_in_progress is True
+
+        refresh_task.cancel()
+        await asyncio.sleep(0)
+
+        assert refresh_task.done() is False
+
+        release_save.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await refresh_task
+
+    assert runtime.state == "idle"
+    assert runtime.refresh_in_progress is False
+
+    event_listener.assert_not_called()
+
+    stored = await runtime._store.async_load()
+    assert stored is not None
+    assert stored["result"] == EVENT_TYPE_SUCCESS
+    assert stored["source"] == "manual"
+    assert stored["repositories"] == 1
+    assert stored["successful"] == 1
+    assert stored["failed"] == 0
+    assert stored["pending"] == 0
 
 
 async def test_refresh_duration_is_propagated_to_event(

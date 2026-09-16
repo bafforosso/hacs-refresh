@@ -302,7 +302,13 @@ class HacsRefreshRuntimeData:
             "failed": self.last_failed,
             "pending": self.last_pending,
         }
-        await self._store.async_save(data)
+
+        save_task = asyncio.create_task(self._store.async_save(data))
+        try:
+            await asyncio.shield(save_task)
+        except asyncio.CancelledError:
+            await save_task
+            raise
 
     async def _update_refresh_result(
         self,
