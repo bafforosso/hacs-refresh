@@ -175,18 +175,24 @@ class HacsRefreshRuntimeData:
                 translation_key="refresh_in_progress",
             )
 
-        async with self._refresh_lock:
-            try:
-                return await self._async_refresh(source=source)
-            except HacsRefreshSkipped:
-                if source == REFRESH_SOURCE_SCHEDULED:
-                    return None
-                raise
-            except HomeAssistantError:
-                if source == REFRESH_SOURCE_SCHEDULED:
-                    _LOGGER.error("Scheduled HACS refresh failed")
-                    return None
-                raise
+        lock_acquired = False
+        try:
+            async with self._refresh_lock:
+                lock_acquired = True
+                try:
+                    return await self._async_refresh(source=source)
+                except HacsRefreshSkipped:
+                    if source == REFRESH_SOURCE_SCHEDULED:
+                        return None
+                    raise
+                except HomeAssistantError:
+                    if source == REFRESH_SOURCE_SCHEDULED:
+                        _LOGGER.error("Scheduled HACS refresh failed")
+                        return None
+                    raise
+        finally:
+            if lock_acquired:
+                self.notify_listeners()
 
     async def _async_refresh(
         self,
@@ -216,21 +222,18 @@ class HacsRefreshRuntimeData:
             result = await self.hacs.async_refresh()
         except HacsUnavailableError as err:
             self.state = STATE_IDLE
-            self.notify_listeners()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="hacs_unavailable",
             ) from err
         except HacsDisabledError as err:
             self.state = STATE_IDLE
-            self.notify_listeners()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="hacs_disabled",
             ) from err
         except HacsQueueRunningError as err:
             self.state = STATE_IDLE
-            self.notify_listeners()
 
             if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.warning(
@@ -256,7 +259,6 @@ class HacsRefreshRuntimeData:
             self.last_failed = 0
             self.last_pending = 0
             await self._async_save_last_refresh()
-            self.notify_listeners()
             self._notify_refresh_completed()
 
             if source == REFRESH_SOURCE_SCHEDULED:
@@ -330,7 +332,6 @@ class HacsRefreshRuntimeData:
 
         await self._async_save_last_refresh()
 
-        self.notify_listeners()
         self._notify_refresh_completed()
 
         outcome = HacsRefreshOutcome(

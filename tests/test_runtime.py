@@ -288,6 +288,30 @@ async def test_refresh_succeeds(
     assert stored["pending"] == 0
 
 
+async def test_refresh_notifies_runtime_listeners_after_lock_is_released(
+    hass: HomeAssistant,
+) -> None:
+    """Test that completion notification occurs after the refresh lock is released."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    refresh_states: list[bool] = []
+
+    def runtime_listener() -> None:
+        refresh_states.append(runtime.refresh_in_progress)
+
+    runtime.add_listener(runtime_listener)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        return_value=_refresh_result(),
+    ):
+        await runtime.async_refresh(source="manual")
+
+    assert refresh_states == [True, False]
+
+
 async def test_refresh_duration_is_propagated_to_event(
     hass: HomeAssistant,
 ) -> None:
