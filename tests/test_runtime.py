@@ -727,7 +727,7 @@ async def test_refresh_preserves_last_completed_state_while_running(
 
 async def test_scheduled_refresh_suppresses_unexpected_error(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that unexpected scheduled refresh errors are recorded and suppressed."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -828,7 +828,7 @@ async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
 
 async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that scheduled refreshes are skipped while another refresh is running."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -845,7 +845,7 @@ async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
 
 async def test_scheduled_refresh_is_skipped_when_queue_is_running(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that a scheduled refresh is skipped when the HACS queue is running."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -871,7 +871,7 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
 
 async def test_scheduled_refresh_suppresses_refresh_error(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that scheduled refresh errors are logged instead of raised."""
     entry = MockConfigEntry(domain=DOMAIN)
