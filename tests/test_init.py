@@ -1,3 +1,7 @@
+import asyncio
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -6,7 +10,11 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    MockModule,
+    mock_integration,
+)
 
 from custom_components.hacs_refresh import (
     PLATFORMS,
@@ -14,8 +22,24 @@ from custom_components.hacs_refresh import (
     async_setup_entry,
     async_unload_entry,
 )
-from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
+from custom_components.hacs_refresh.const import (
+    CONF_AUTOMATIC_REFRESH,
+    CONF_DAYS,
+    CONF_TIMES,
+    DOMAIN,
+    SERVICE_REFRESH,
+)
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
+
+
+@pytest.fixture
+def mock_hacs_integration(hass: HomeAssistant) -> None:
+    """Mock the HACS integration dependency."""
+    mock_integration(
+        hass,
+        MockModule("hacs"),
+        built_in=False,
+    )
 
 
 def test_platforms() -> None:
@@ -255,6 +279,82 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
 
         scheduler.async_setup.assert_awaited_once()
         mock_notify_listeners.assert_called_once_with()
+
+
+async def test_unload_entry_cancels_scheduled_refresh(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that unloading the entry cancels a scheduled refresh."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["mon"],
+            CONF_TIMES: ["03:00"],
+        },
+    )
+    config_entry.add_to_hass(hass)
+
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        AsyncMock(),
+    )
+
+    refresh_started = asyncio.Event()
+    refresh_cancelled = asyncio.Event()
+    scheduled_callback: Callable[[datetime], Any] | None = None
+
+    async def async_refresh() -> None:
+        """Keep the HACS refresh running until it is cancelled."""
+        refresh_started.set()
+
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            refresh_cancelled.set()
+            raise
+
+    def capture_callback(
+        _hass: HomeAssistant,
+        callback: Callable[[datetime], Any],
+        **_kwargs: object,
+    ) -> MagicMock:
+        """Capture the scheduled callback."""
+        nonlocal scheduled_callback
+        scheduled_callback = callback
+        return MagicMock()
+
+    hass.data["hacs"] = MagicMock()
+
+    with patch(
+        "custom_components.hacs_refresh.scheduler.async_track_time_change",
+        side_effect=capture_callback,
+    ):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert scheduled_callback is not None
+
+        runtime = config_entry.runtime_data
+
+        with patch.object(runtime.hacs, "async_refresh", new=async_refresh):
+            scheduled_callback(
+                datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
+            )
+
+            await refresh_started.wait()
+
+            assert runtime.refresh_in_progress is True
+
+            assert await hass.config_entries.async_unload(config_entry.entry_id)
+            await hass.async_block_till_done()
+
+    assert refresh_cancelled.is_set()
+    assert runtime.refresh_in_progress is False
 
 
 async def test_unload_entry_unloads_platforms(

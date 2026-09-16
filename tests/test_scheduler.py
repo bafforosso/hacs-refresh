@@ -109,8 +109,8 @@ async def test_scheduler_triggers_refresh_on_configured_day(
             new_callable=AsyncMock,
         ) as mock_refresh,
         patch.object(
-            hass,
-            "async_create_task",
+            entry,
+            "async_create_background_task",
         ) as create_task_mock,
     ):
         scheduler._handle_scheduled_time(
@@ -119,7 +119,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
 
         create_task_mock.assert_called_once()
 
-        refresh_coroutine = create_task_mock.call_args.args[0]
+        refresh_coroutine = create_task_mock.call_args.args[1]
         await refresh_coroutine
 
     mock_refresh.assert_awaited_once_with(source="scheduled")
@@ -148,8 +148,8 @@ async def test_scheduler_skips_non_configured_day(
             new_callable=AsyncMock,
         ) as mock_refresh,
         patch.object(
-            hass,
-            "async_create_task",
+            entry,
+            "async_create_background_task",
         ) as create_task_mock,
     ):
         # Tuesday — Monday is the only configured day.
@@ -181,8 +181,8 @@ async def test_scheduler_skips_when_refresh_is_in_progress(
         assert runtime.refresh_in_progress is True
 
         with patch.object(
-            hass,
-            "async_create_task",
+            entry,
+            "async_create_background_task",
         ) as create_task_mock:
             scheduler._handle_scheduled_time(
                 datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
