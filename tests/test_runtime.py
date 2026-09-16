@@ -312,6 +312,77 @@ async def test_refresh_notifies_runtime_listeners_after_lock_is_released(
     assert refresh_states == [True, False]
 
 
+async def test_refresh_handles_cancellation(
+    hass: HomeAssistant,
+) -> None:
+    """Test that cancelling a refresh resets runtime state without completing it."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+    runtime.last_completed = completed
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = "scheduled"
+    runtime.last_message = None
+    runtime.last_duration = 2.5
+    runtime.last_repositories = 5
+    runtime.last_successful = 5
+    runtime.last_failed = 0
+    runtime.last_pending = 0
+
+    refresh_started = asyncio.Event()
+    refresh_states: list[bool] = []
+    event_listener = MagicMock()
+
+    def runtime_listener() -> None:
+        refresh_states.append(runtime.refresh_in_progress)
+
+    async def async_refresh() -> HacsRefreshResult:
+        refresh_started.set()
+        await asyncio.Event().wait()
+        return _refresh_result()
+
+    runtime.add_listener(runtime_listener)
+    runtime.add_event_listener(event_listener)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new=async_refresh,
+    ):
+        refresh_task = asyncio.create_task(runtime.async_refresh(source="manual"))
+        await refresh_started.wait()
+
+        assert runtime.state == "refreshing"
+        assert runtime.refresh_in_progress is True
+
+        refresh_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await refresh_task
+
+    assert runtime.state == "idle"
+    assert runtime.refresh_in_progress is False
+    assert refresh_states == [True, False]
+    event_listener.assert_not_called()
+    assert runtime.last_completed == completed
+    assert runtime.last_result == EVENT_TYPE_SUCCESS
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_message is None
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 5
+    assert runtime.last_successful == 5
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
+
+
 async def test_refresh_duration_is_propagated_to_event(
     hass: HomeAssistant,
 ) -> None:

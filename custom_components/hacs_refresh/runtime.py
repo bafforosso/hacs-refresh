@@ -220,6 +220,9 @@ class HacsRefreshRuntimeData:
         start = perf_counter()
         try:
             result = await self.hacs.async_refresh()
+        except asyncio.CancelledError:
+            self.state = STATE_IDLE
+            raise
         except HacsUnavailableError as err:
             self.state = STATE_IDLE
             raise HomeAssistantError(
