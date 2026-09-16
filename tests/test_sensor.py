@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
@@ -19,17 +18,29 @@ def test_status_sensor_initializes() -> None:
     runtime.entry.entry_id = "test-entry"
     runtime.state = "idle"
 
-    remove_listener = MagicMock()
-    runtime.add_listener.return_value = remove_listener
-
     sensor = HacsRefreshStatusSensor(runtime)
 
     assert sensor.runtime is runtime
     assert sensor.native_value == "idle"
     assert sensor.unique_id == "hacs_refresh_status"
     assert sensor._attr_translation_key == "status"
-    assert sensor._remove_listener is remove_listener
+    runtime.add_listener.assert_not_called()
+
+
+async def test_status_sensor_registers_runtime_listener() -> None:
+    """Test that the sensor registers its runtime listener when added to HA."""
+    runtime = MagicMock()
+    runtime.entry.entry_id = "test-entry"
+    remove_listener = MagicMock()
+    runtime.add_listener.return_value = remove_listener
+
+    sensor = HacsRefreshStatusSensor(runtime)
+
+    with patch.object(sensor, "async_on_remove") as mock_async_on_remove:
+        await sensor.async_added_to_hass()
+
     runtime.add_listener.assert_called_once_with(sensor._async_runtime_updated)
+    mock_async_on_remove.assert_called_once_with(remove_listener)
 
 
 def test_status_sensor_extra_state_attributes(freezer) -> None:
@@ -76,22 +87,6 @@ def test_status_sensor_runtime_update_writes_state() -> None:
         sensor._async_runtime_updated()
 
     mock_write_state.assert_called_once_with()
-
-
-async def test_status_sensor_removes_runtime_listener_when_removed(
-    hass: HomeAssistant,
-) -> None:
-    """Test that removing the sensor unregisters its runtime listener."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-    remove_listener = MagicMock()
-    runtime.add_listener.return_value = remove_listener
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    await sensor.async_will_remove_from_hass()
-
-    remove_listener.assert_called_once_with()
 
 
 def test_status_sensor_next_refresh_disabled() -> None:

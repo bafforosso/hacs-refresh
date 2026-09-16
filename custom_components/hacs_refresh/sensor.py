@@ -44,14 +44,10 @@ class HacsRefreshStatusSensor(
     _attr_should_poll = False
     _attr_unique_id = "hacs_refresh_status"
 
-    def __init__(
-        self,
-        runtime: HacsRefreshRuntimeData,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(runtime)
-
-        self._remove_listener = runtime.add_listener(self._async_runtime_updated)
+    async def async_added_to_hass(self) -> None:
+        """Register the runtime listener."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self.runtime.add_listener(self._async_runtime_updated))
 
     @property
     def native_value(self) -> str:
@@ -140,11 +136,3 @@ class HacsRefreshStatusSensor(
             return None
 
         return min(candidates).isoformat()
-
-    async def async_will_remove_from_hass(
-        self,
-    ) -> None:
-        """Clean up runtime listeners."""
-        self._remove_listener()
-
-        await super().async_will_remove_from_hass()
