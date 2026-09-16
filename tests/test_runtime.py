@@ -256,9 +256,12 @@ async def test_refresh_succeeds(
             side_effect=[10.0, 12.5],
         ),
     ):
-        await runtime.async_refresh(source="manual")
+        outcome = await runtime.async_refresh(source="manual")
 
     mock_refresh.assert_awaited_once_with()
+    assert outcome is not None
+    assert outcome.successful == 1
+    assert outcome.duration == 2.5
 
     assert runtime.state == "idle"
     assert runtime.last_completed is not None
@@ -951,7 +954,10 @@ async def test_refresh_succeeds_with_no_repositories(
             successful=0,
         ),
     ) as mock_refresh:
-        await runtime.async_refresh(source="manual")
+        outcome = await runtime.async_refresh(source="manual")
+
+    assert outcome is not None
+    assert outcome.successful == 0
 
     assert runtime.state == "idle"
     assert runtime.last_result == "success"

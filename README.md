@@ -79,7 +79,12 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 
 A manual refresh can be triggered using the **Refresh** button.
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the number of successfully refreshed repositories and the refresh duration when response data is requested.
+
+```yaml
+action: hacs_refresh.refresh
+response_variable: refresh_result
+```
 
 Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 

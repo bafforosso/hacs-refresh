@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
@@ -15,6 +15,7 @@ from custom_components.hacs_refresh import (
     async_unload_entry,
 )
 from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
+from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 
 
 def test_platforms() -> None:
@@ -77,6 +78,84 @@ async def test_refresh_service_triggers_manual_refresh(
         )
 
     mock_refresh.assert_awaited_once_with(source="manual")
+
+
+async def test_refresh_service_supports_optional_response(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service optionally supports response data."""
+    await async_setup(hass, {})
+
+    assert (
+        hass.services.supports_response(DOMAIN, SERVICE_REFRESH)
+        is SupportsResponse.OPTIONAL
+    )
+
+
+async def test_refresh_service_returns_response_data(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service returns response data when requested."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        return_value=HacsRefreshOutcome(
+            successful=5,
+            duration=2.5,
+        )
+    )
+    config_entry = MagicMock()
+    config_entry.runtime_data = runtime
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[config_entry],
+    ):
+        response = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+            return_response=True,
+        )
+
+    assert response == {
+        "successful": 5,
+        "duration": 2.5,
+    }
+    runtime.async_refresh.assert_awaited_once_with(source="manual")
+
+
+async def test_refresh_service_does_not_return_response_data_by_default(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service does not return response data by default."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        return_value=HacsRefreshOutcome(
+            successful=5,
+            duration=2.5,
+        )
+    )
+    config_entry = MagicMock()
+    config_entry.runtime_data = runtime
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[config_entry],
+    ):
+        response = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+        )
+
+    assert response is None
+    runtime.async_refresh.assert_awaited_once_with(source="manual")
 
 
 async def test_setup_entry_requires_hacs(
