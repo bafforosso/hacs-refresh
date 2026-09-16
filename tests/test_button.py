@@ -1,6 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from custom_components.hacs_refresh.button import HacsRefreshButton
+from homeassistant.core import HomeAssistant
+
+from custom_components.hacs_refresh.button import (
+    HacsRefreshButton,
+    async_setup_entry,
+)
 
 
 def test_refresh_button_initializes() -> None:
@@ -14,6 +19,22 @@ def test_refresh_button_initializes() -> None:
     assert button.unique_id == "hacs_refresh_manual_refresh"
     assert button._attr_translation_key == "refresh"
     runtime.add_listener.assert_not_called()
+
+
+async def test_refresh_button_setup_entry(hass: HomeAssistant) -> None:
+    """Test that the refresh button is created for the config entry."""
+    runtime = MagicMock()
+    entry = MagicMock()
+    entry.runtime_data = runtime
+    add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, add_entities)
+
+    add_entities.assert_called_once()
+    entities = add_entities.call_args.args[0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], HacsRefreshButton)
+    assert entities[0].runtime is runtime
 
 
 def test_refresh_button_availability() -> None:

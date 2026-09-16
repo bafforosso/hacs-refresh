@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
@@ -9,7 +10,10 @@ from custom_components.hacs_refresh.const import (
     CONF_TIMES,
     EVENT_TYPE_SUCCESS,
 )
-from custom_components.hacs_refresh.sensor import HacsRefreshStatusSensor
+from custom_components.hacs_refresh.sensor import (
+    HacsRefreshStatusSensor,
+    async_setup_entry,
+)
 
 
 def test_status_sensor_initializes() -> None:
@@ -25,6 +29,22 @@ def test_status_sensor_initializes() -> None:
     assert sensor.unique_id == "hacs_refresh_status"
     assert sensor._attr_translation_key == "status"
     runtime.add_listener.assert_not_called()
+
+
+async def test_status_sensor_setup_entry(hass: HomeAssistant) -> None:
+    """Test that the status sensor is created for the config entry."""
+    runtime = MagicMock()
+    entry = MagicMock()
+    entry.runtime_data = runtime
+    add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, add_entities)
+
+    add_entities.assert_called_once()
+    entities = add_entities.call_args.args[0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], HacsRefreshStatusSensor)
+    assert entities[0].runtime is runtime
 
 
 async def test_status_sensor_registers_runtime_listener() -> None:
@@ -110,6 +130,20 @@ def test_status_sensor_next_refresh_without_schedule() -> None:
         CONF_AUTOMATIC_REFRESH: True,
         CONF_DAYS: [],
         CONF_TIMES: [],
+    }
+
+    sensor = HacsRefreshStatusSensor(runtime)
+
+    assert sensor.extra_state_attributes["next_refresh"] is None
+
+
+def test_status_sensor_next_refresh_without_valid_schedule_day() -> None:
+    """Test that next_refresh is unavailable when no valid schedule day is configured."""
+    runtime = MagicMock()
+    runtime.options = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["invalid"],
+        CONF_TIMES: ["02:30"],
     }
 
     sensor = HacsRefreshStatusSensor(runtime)

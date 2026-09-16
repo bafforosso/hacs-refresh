@@ -7,7 +7,10 @@ from custom_components.hacs_refresh.const import (
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
 )
-from custom_components.hacs_refresh.event import HacsRefreshCompletedEvent
+from custom_components.hacs_refresh.event import (
+    HacsRefreshCompletedEvent,
+    async_setup_entry,
+)
 
 
 def test_refresh_completed_event_initializes() -> None:
@@ -25,6 +28,24 @@ def test_refresh_completed_event_initializes() -> None:
         EVENT_TYPE_PARTIAL,
         EVENT_TYPE_FAILED,
     ]
+
+
+async def test_refresh_completed_event_setup_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh completed event is created for the config entry."""
+    runtime = MagicMock()
+    entry = MagicMock()
+    entry.runtime_data = runtime
+    add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, add_entities)
+
+    add_entities.assert_called_once()
+    entities = add_entities.call_args.args[0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], HacsRefreshCompletedEvent)
+    assert entities[0].runtime is runtime
 
 
 def test_refresh_completed_event_triggers_event() -> None:

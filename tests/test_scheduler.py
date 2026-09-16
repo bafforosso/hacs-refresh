@@ -161,6 +161,40 @@ async def test_scheduler_skips_non_configured_day(
     mock_refresh.assert_not_awaited()
 
 
+async def test_scheduler_skips_when_days_are_not_configured(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a scheduled time is ignored when no days are configured."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_TIMES: ["03:00"],
+        },
+    )
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    scheduler = HacsRefreshScheduler(hass, runtime)
+
+    with (
+        patch.object(
+            runtime,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch.object(
+            entry,
+            "async_create_background_task",
+        ) as create_task_mock,
+    ):
+        scheduler._handle_scheduled_time(
+            datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
+        )
+
+    create_task_mock.assert_not_called()
+    mock_refresh.assert_not_awaited()
+
+
 async def test_scheduler_skips_when_refresh_is_in_progress(
     hass: HomeAssistant,
 ) -> None:
