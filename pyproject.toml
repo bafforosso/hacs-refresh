@@ -18,7 +18,8 @@ dev = [
 branch = true
 
 [tool.coverage.report]
-fail_under = 95
+precision = 2
+fail_under = 95.01
 
 [tool.mypy]
 python_version = "3.14"
