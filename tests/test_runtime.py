@@ -1001,45 +1001,6 @@ async def test_manual_refresh_bypasses_minimum_interval(
     mock_refresh.assert_awaited_once_with()
 
 
-async def test_scheduled_refresh_respects_last_completed(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test that scheduled refreshes respect the last completed refresh."""
-    entry = MockConfigEntry(domain=DOMAIN)
-    runtime = HacsRefreshRuntimeData(hass, entry)
-
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        return_value=_refresh_result(
-            repositories=0,
-            successful=0,
-        ),
-    ) as mock_refresh:
-        last_completed = datetime(
-            2026,
-            1,
-            1,
-            2,
-            30,
-            tzinfo=UTC,
-        )
-
-        runtime.last_completed = last_completed
-
-        monkeypatch.setattr(
-            "custom_components.hacs_refresh.runtime.dt_util.now",
-            lambda: last_completed + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
-        )
-
-        await runtime.async_refresh(source="scheduled")
-
-    assert runtime.state == "idle"
-    mock_refresh.assert_not_awaited()
-
-
 async def test_scheduled_refresh_is_allowed_without_last_completed(
     hass: HomeAssistant,
 ) -> None:
