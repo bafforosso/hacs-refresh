@@ -142,7 +142,7 @@ Its `attributes` provide further details about the refresh:
 | Attribute | Type | Presence | Values / Format | Description |
 | --- | --- | --- | --- | --- |
 | `source` | string | Always | `scheduled`, `manual` | What triggered the refresh. |
-| `duration` | number \| `null` | Always | Seconds | Duration associated with the refresh. |
+| `duration` | number | Always | Seconds | Duration of the completed refresh. |
 | `repositories` | integer | Always | ≥ 0 | Total number of repositories included in the refresh. |
 | `successful` | integer | Always | ≥ 0 | Number of repositories refreshed successfully. |
 | `failed` | integer | Always | ≥ 0 | Number of repositories that failed to refresh. |
