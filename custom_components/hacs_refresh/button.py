@@ -11,6 +11,8 @@ from .const import REFRESH_SOURCE_MANUAL
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
