@@ -107,11 +107,11 @@ Its `state` shows whether a refresh is currently running:
 Its `attributes` provide details about the configured automatic refresh schedule:
 
 | Attribute | Type | Values / Format | Description |
-| --- | --- | --- | --- |
-| `automatic_refresh` | boolean | `true` / `false` | Whether automatic refresh is enabled. |
-| `schedule_days` | list of strings | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
-| `schedule_times` | list of strings | `HH:MM` | Times configured for automatic refreshes. |
-| `next_refresh` | string \| `null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
+| --- | :---: | :---: | --- |
+| `automatic_refresh` | `bool` | `true` / `false` | Whether automatic refresh is enabled. |
+| `schedule_days` | `list[str]` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
+| `schedule_times` | `list[str]` | `HH:MM` | Times configured for automatic refreshes. |
+| `next_refresh` | `str \| null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
 
 ## Refresh Completed Event
 
@@ -140,13 +140,13 @@ The refresh result is reported by `event_type`:
 Its `attributes` provide further details about the refresh:
 
 | Attribute | Type | Presence | Values / Format | Description |
-| --- | --- | --- | --- | --- |
-| `source` | string | Always | `scheduled`, `manual` | What triggered the refresh. |
-| `duration` | number | Always | Seconds | Duration of the completed refresh. |
-| `repositories` | integer | Always | ≥ 0 | Total number of repositories included in the refresh. |
-| `successful` | integer | Always | ≥ 0 | Number of repositories refreshed successfully. |
-| `failed` | integer | Always | ≥ 0 | Number of repositories that failed to refresh. |
-| `pending` | integer | Always | ≥ 0 | Number of repositories that remain pending. |
-| `message` | string | Conditional | Human-readable text | Refresh issue or error. |
+| --- | :---: | :---: | :---: | --- |
+| `source` | `str` | Always | `scheduled`, `manual` | What triggered the refresh. |
+| `duration` | `float` | Always | Seconds | Duration of the completed refresh. |
+| `repositories` | `int` | Always | ≥ 0 | Total number of repositories included in the refresh. |
+| `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
+| `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
+| `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
+| `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.
