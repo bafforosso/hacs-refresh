@@ -109,6 +109,8 @@ class HacsRefreshScheduler:
             )
             return
 
-        self.hass.async_create_task(
-            self.runtime.async_refresh(source=REFRESH_SOURCE_SCHEDULED)
+        self.runtime.entry.async_create_background_task(
+            self.hass,
+            self.runtime.async_refresh(source=REFRESH_SOURCE_SCHEDULED),
+            "scheduled refresh",
         )

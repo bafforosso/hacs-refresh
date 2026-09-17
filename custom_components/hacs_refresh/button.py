@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import REFRESH_SOURCE_MANUAL
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -31,6 +33,21 @@ class HacsRefreshButton(
 
     _attr_translation_key = "refresh"
     _attr_unique_id = "hacs_refresh_manual_refresh"
+
+    async def async_added_to_hass(self) -> None:
+        """Register the runtime listener."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self.runtime.add_listener(self._async_runtime_updated))
+
+    @property
+    def available(self) -> bool:
+        """Return whether a refresh can be started."""
+        return not self.runtime.refresh_in_progress
+
+    @callback
+    def _async_runtime_updated(self) -> None:
+        """Update the button."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press."""

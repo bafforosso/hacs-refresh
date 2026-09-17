@@ -2,6 +2,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import (
+    MockModule,
+    mock_integration,
+)
 
 
 @pytest.fixture
@@ -38,3 +43,13 @@ def hacs() -> MagicMock:
     hacs.data.async_write = AsyncMock()
 
     return hacs
+
+
+@pytest.fixture
+def mock_hacs_integration(hass: HomeAssistant) -> None:
+    """Mock the HACS integration dependency."""
+    mock_integration(
+        hass,
+        MockModule("hacs"),
+        built_in=False,
+    )

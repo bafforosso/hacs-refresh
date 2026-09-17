@@ -79,7 +79,12 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 
 A manual refresh can be triggered using the **Refresh** button.
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the number of successfully refreshed repositories and the refresh duration when response data is requested.
+
+```yaml
+action: hacs_refresh.refresh
+response_variable: refresh_result
+```
 
 Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
@@ -114,7 +119,9 @@ The integration provides an event entity:
 
 `event.hacs_refresh_refresh_completed`
 
-The event fires whenever a refresh attempt completes and can be used in automations or other Home Assistant features for monitoring or follow-up actions.
+The event is triggered when a refresh completes with a recorded result and can be used in automations or other Home Assistant features for monitoring or follow-up actions.
+
+The event is not triggered when a scheduled refresh is skipped before it starts, or when a refresh is cancelled.
 
 Its `state` is the timestamp of the most recent completed refresh:
 
@@ -126,16 +133,16 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | The refresh completed successfully. |
-| `partial` | The refresh completed with repositories still pending. |
-| `failed` | The refresh completed with one or more repository refreshes failing. |
+| `success` | The refresh completed successfully for all repositories. |
+| `partial` | The refresh completed with one or more repositories still pending. |
+| `failed` | The refresh completed with one or more repositories failing to refresh. |
 
 Its `attributes` provide further details about the refresh:
 
 | Attribute | Type | Presence | Values / Format | Description |
 | --- | --- | --- | --- | --- |
 | `source` | string | Always | `scheduled`, `manual` | What triggered the refresh. |
-| `duration` | number \| `null` | Always | Seconds | Duration associated with the refresh. |
+| `duration` | number | Always | Seconds | Duration of the completed refresh. |
 | `repositories` | integer | Always | ≥ 0 | Total number of repositories included in the refresh. |
 | `successful` | integer | Always | ≥ 0 | Number of repositories refreshed successfully. |
 | `failed` | integer | Always | ≥ 0 | Number of repositories that failed to refresh. |

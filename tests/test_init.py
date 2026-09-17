@@ -1,7 +1,11 @@
+import asyncio
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
@@ -14,7 +18,14 @@ from custom_components.hacs_refresh import (
     async_setup_entry,
     async_unload_entry,
 )
-from custom_components.hacs_refresh.const import DOMAIN, SERVICE_REFRESH
+from custom_components.hacs_refresh.const import (
+    CONF_AUTOMATIC_REFRESH,
+    CONF_DAYS,
+    CONF_TIMES,
+    DOMAIN,
+    SERVICE_REFRESH,
+)
+from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 
 
 def test_platforms() -> None:
@@ -77,6 +88,84 @@ async def test_refresh_service_triggers_manual_refresh(
         )
 
     mock_refresh.assert_awaited_once_with(source="manual")
+
+
+async def test_refresh_service_supports_optional_response(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service optionally supports response data."""
+    await async_setup(hass, {})
+
+    assert (
+        hass.services.supports_response(DOMAIN, SERVICE_REFRESH)
+        is SupportsResponse.OPTIONAL
+    )
+
+
+async def test_refresh_service_returns_response_data(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service returns response data when requested."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        return_value=HacsRefreshOutcome(
+            successful=5,
+            duration=2.5,
+        )
+    )
+    config_entry = MagicMock()
+    config_entry.runtime_data = runtime
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[config_entry],
+    ):
+        response = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+            return_response=True,
+        )
+
+    assert response == {
+        "successful": 5,
+        "duration": 2.5,
+    }
+    runtime.async_refresh.assert_awaited_once_with(source="manual")
+
+
+async def test_refresh_service_does_not_return_response_data_by_default(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service does not return response data by default."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        return_value=HacsRefreshOutcome(
+            successful=5,
+            duration=2.5,
+        )
+    )
+    config_entry = MagicMock()
+    config_entry.runtime_data = runtime
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[config_entry],
+    ):
+        response = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+        )
+
+    assert response is None
+    runtime.async_refresh.assert_awaited_once_with(source="manual")
 
 
 async def test_setup_entry_requires_hacs(
@@ -176,6 +265,82 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
 
         scheduler.async_setup.assert_awaited_once()
         mock_notify_listeners.assert_called_once_with()
+
+
+async def test_unload_entry_cancels_scheduled_refresh(
+    hass: HomeAssistant,
+    enable_custom_integrations: None,
+    mock_hacs_integration: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that unloading the entry cancels a scheduled refresh."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["mon"],
+            CONF_TIMES: ["03:00"],
+        },
+    )
+    config_entry.add_to_hass(hass)
+
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        AsyncMock(),
+    )
+
+    refresh_started = asyncio.Event()
+    refresh_cancelled = asyncio.Event()
+    scheduled_callback: Callable[[datetime], Any] | None = None
+
+    async def async_refresh() -> None:
+        """Keep the HACS refresh running until it is cancelled."""
+        refresh_started.set()
+
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            refresh_cancelled.set()
+            raise
+
+    def capture_callback(
+        _hass: HomeAssistant,
+        callback: Callable[[datetime], Any],
+        **_kwargs: object,
+    ) -> MagicMock:
+        """Capture the scheduled callback."""
+        nonlocal scheduled_callback
+        scheduled_callback = callback
+        return MagicMock()
+
+    hass.data["hacs"] = MagicMock()
+
+    with patch(
+        "custom_components.hacs_refresh.scheduler.async_track_time_change",
+        side_effect=capture_callback,
+    ):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert scheduled_callback is not None
+
+        runtime = config_entry.runtime_data
+
+        with patch.object(runtime.hacs, "async_refresh", new=async_refresh):
+            scheduled_callback(
+                datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
+            )
+
+            await refresh_started.wait()
+
+            assert runtime.refresh_in_progress is True
+
+            assert await hass.config_entries.async_unload(config_entry.entry_id)
+            await hass.async_block_till_done()
+
+    assert refresh_cancelled.is_set()
+    assert runtime.refresh_in_progress is False
 
 
 async def test_unload_entry_unloads_platforms(

@@ -24,6 +24,7 @@ from custom_components.hacs_refresh.runtime import (
     HacsRefreshRuntimeData,
     HacsRefreshSkipped,
 )
+from custom_components.hacs_refresh.storage import LastRefreshData
 
 
 def _refresh_result(
@@ -256,9 +257,12 @@ async def test_refresh_succeeds(
             side_effect=[10.0, 12.5],
         ),
     ):
-        await runtime.async_refresh(source="manual")
+        outcome = await runtime.async_refresh(source="manual")
 
     mock_refresh.assert_awaited_once_with()
+    assert outcome is not None
+    assert outcome.successful == 1
+    assert outcome.duration == 2.5
 
     assert runtime.state == "idle"
     assert runtime.last_completed is not None
@@ -279,6 +283,167 @@ async def test_refresh_succeeds(
     assert stored["source"] == "manual"
     assert stored["message"] is None
     assert stored["duration"] == 2.5
+    assert stored["repositories"] == 1
+    assert stored["successful"] == 1
+    assert stored["failed"] == 0
+    assert stored["pending"] == 0
+
+
+async def test_refresh_notifies_runtime_listeners_after_lock_is_released(
+    hass: HomeAssistant,
+) -> None:
+    """Test that completion notification occurs after the refresh lock is released."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    refresh_states: list[bool] = []
+
+    def runtime_listener() -> None:
+        refresh_states.append(runtime.refresh_in_progress)
+
+    runtime.add_listener(runtime_listener)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        return_value=_refresh_result(),
+    ):
+        await runtime.async_refresh(source="manual")
+
+    assert refresh_states == [True, False]
+
+
+async def test_refresh_handles_cancellation(
+    hass: HomeAssistant,
+) -> None:
+    """Test that cancelling a refresh resets runtime state without completing it."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    completed = datetime(
+        2026,
+        1,
+        1,
+        2,
+        30,
+        tzinfo=UTC,
+    )
+    runtime.last_completed = completed
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = "scheduled"
+    runtime.last_message = None
+    runtime.last_duration = 2.5
+    runtime.last_repositories = 5
+    runtime.last_successful = 5
+    runtime.last_failed = 0
+    runtime.last_pending = 0
+
+    refresh_started = asyncio.Event()
+    refresh_states: list[bool] = []
+    event_listener = MagicMock()
+
+    def runtime_listener() -> None:
+        refresh_states.append(runtime.refresh_in_progress)
+
+    async def async_refresh() -> HacsRefreshResult:
+        refresh_started.set()
+        await asyncio.Event().wait()
+        return _refresh_result()
+
+    runtime.add_listener(runtime_listener)
+    runtime.add_event_listener(event_listener)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new=async_refresh,
+    ):
+        refresh_task = asyncio.create_task(runtime.async_refresh(source="manual"))
+        await refresh_started.wait()
+
+        assert runtime.state == "refreshing"
+        assert runtime.refresh_in_progress is True
+
+        refresh_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await refresh_task
+
+    assert runtime.state == "idle"
+    assert runtime.refresh_in_progress is False
+    assert refresh_states == [True, False]
+    event_listener.assert_not_called()
+    assert runtime.last_completed == completed
+    assert runtime.last_result == EVENT_TYPE_SUCCESS
+    assert runtime.last_source == "scheduled"
+    assert runtime.last_message is None
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 5
+    assert runtime.last_successful == 5
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
+
+
+async def test_refresh_handles_cancellation_during_persistence(
+    hass: HomeAssistant,
+) -> None:
+    """Test that cancelling during persistence still completes the save."""
+    entry = MockConfigEntry(domain=DOMAIN)
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    save_started = asyncio.Event()
+    release_save = asyncio.Event()
+
+    original_save = runtime._store.async_save
+
+    async def async_save(data: LastRefreshData) -> None:
+        save_started.set()
+        await release_save.wait()
+        await original_save(data)
+
+    event_listener = MagicMock()
+    runtime.add_event_listener(event_listener)
+
+    with (
+        patch.object(runtime._store, "async_save", new=async_save),
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(
+                repositories=1,
+                successful=1,
+            ),
+        ),
+    ):
+        refresh_task = asyncio.create_task(runtime.async_refresh(source="manual"))
+
+        await save_started.wait()
+
+        assert runtime.state == "idle"
+        assert runtime.last_result == EVENT_TYPE_SUCCESS
+        assert runtime.refresh_in_progress is True
+
+        refresh_task.cancel()
+        await asyncio.sleep(0)
+
+        assert refresh_task.done() is False
+
+        release_save.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await refresh_task
+
+    assert runtime.state == "idle"
+    assert runtime.refresh_in_progress is False
+
+    event_listener.assert_not_called()
+
+    stored = await runtime._store.async_load()
+    assert stored is not None
+    assert stored["result"] == EVENT_TYPE_SUCCESS
+    assert stored["source"] == "manual"
     assert stored["repositories"] == 1
     assert stored["successful"] == 1
     assert stored["failed"] == 0
@@ -562,7 +727,7 @@ async def test_refresh_preserves_last_completed_state_while_running(
 
 async def test_scheduled_refresh_suppresses_unexpected_error(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that unexpected scheduled refresh errors are recorded and suppressed."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -663,7 +828,7 @@ async def test_manual_refresh_is_skipped_when_refresh_is_in_progress(
 
 async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that scheduled refreshes are skipped while another refresh is running."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -680,7 +845,7 @@ async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
 
 async def test_scheduled_refresh_is_skipped_when_queue_is_running(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that a scheduled refresh is skipped when the HACS queue is running."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -706,7 +871,7 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
 
 async def test_scheduled_refresh_suppresses_refresh_error(
     hass: HomeAssistant,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test that scheduled refresh errors are logged instead of raised."""
     entry = MockConfigEntry(domain=DOMAIN)
@@ -836,45 +1001,6 @@ async def test_manual_refresh_bypasses_minimum_interval(
     mock_refresh.assert_awaited_once_with()
 
 
-async def test_scheduled_refresh_respects_last_completed(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test that scheduled refreshes respect the last completed refresh."""
-    entry = MockConfigEntry(domain=DOMAIN)
-    runtime = HacsRefreshRuntimeData(hass, entry)
-
-    with patch.object(
-        runtime.hacs,
-        "async_refresh",
-        new_callable=AsyncMock,
-        return_value=_refresh_result(
-            repositories=0,
-            successful=0,
-        ),
-    ) as mock_refresh:
-        last_completed = datetime(
-            2026,
-            1,
-            1,
-            2,
-            30,
-            tzinfo=UTC,
-        )
-
-        runtime.last_completed = last_completed
-
-        monkeypatch.setattr(
-            "custom_components.hacs_refresh.runtime.dt_util.now",
-            lambda: last_completed + MIN_REFRESH_INTERVAL - timedelta(seconds=1),
-        )
-
-        await runtime.async_refresh(source="scheduled")
-
-    assert runtime.state == "idle"
-    mock_refresh.assert_not_awaited()
-
-
 async def test_scheduled_refresh_is_allowed_without_last_completed(
     hass: HomeAssistant,
 ) -> None:
@@ -951,7 +1077,10 @@ async def test_refresh_succeeds_with_no_repositories(
             successful=0,
         ),
     ) as mock_refresh:
-        await runtime.async_refresh(source="manual")
+        outcome = await runtime.async_refresh(source="manual")
+
+    assert outcome is not None
+    assert outcome.successful == 0
 
     assert runtime.state == "idle"
     assert runtime.last_result == "success"

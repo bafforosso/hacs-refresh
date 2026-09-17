@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
 from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
@@ -35,7 +40,7 @@ async def async_setup(
 
     async def async_refresh(
         call: ServiceCall,
-    ) -> None:
+    ) -> ServiceResponse:
         """Force-refresh all installed HACS repositories."""
         entries = hass.config_entries.async_loaded_entries(DOMAIN)
 
@@ -49,12 +54,24 @@ async def async_setup(
 
         runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+        if not call.return_response:
+            return None
+
+        if outcome is None:
+            return None
+
+        return {
+            "successful": outcome.successful,
+            "duration": outcome.duration,
+        }
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_REFRESH,
         async_refresh,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     return True
