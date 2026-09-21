@@ -5,6 +5,8 @@ from datetime import timedelta
 DOMAIN = "hacs_refresh"
 INTEGRATION_NAME = "HACS Refresh"
 
+MIN_HA_VERSION = "2024.12.0"
+
 SERVICE_REFRESH = "refresh"
 
 EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"

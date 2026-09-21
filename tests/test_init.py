@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
+    ConfigEntryError,
     ConfigEntryNotReady,
     ServiceValidationError,
 )
@@ -23,6 +24,7 @@ from custom_components.hacs_refresh.const import (
     CONF_DAYS,
     CONF_TIMES,
     DOMAIN,
+    MIN_HA_VERSION,
     SERVICE_REFRESH,
 )
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
@@ -168,6 +170,32 @@ async def test_refresh_service_does_not_return_response_data_by_default(
     runtime.async_refresh.assert_awaited_once_with(source="manual")
 
 
+async def test_setup_entry_rejects_unsupported_home_assistant_version(
+    hass: HomeAssistant,
+) -> None:
+    """Test that setup fails on an unsupported Home Assistant version."""
+    config_entry = MockConfigEntry(domain=DOMAIN)
+
+    with (
+        patch(
+            "custom_components.hacs_refresh.HAVERSION",
+            "0.0.0",
+        ),
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshRuntimeData",
+        ) as runtime_class,
+        pytest.raises(ConfigEntryError) as err,
+    ):
+        await async_setup_entry(hass, config_entry)
+
+    assert err.value.translation_domain == DOMAIN
+    assert err.value.translation_key == "min_ha_version"
+    assert err.value.translation_placeholders == {
+        "version": MIN_HA_VERSION,
+    }
+    runtime_class.assert_not_called()
+
+
 async def test_setup_entry_requires_hacs(
     hass: HomeAssistant,
 ) -> None:
@@ -200,6 +228,10 @@ async def test_setup_entry_initializes_integration(
     )
 
     with (
+        patch(
+            "custom_components.hacs_refresh.HAVERSION",
+            MIN_HA_VERSION,
+        ),
         patch("custom_components.hacs_refresh.HacsRefreshScheduler") as scheduler_class,
         patch(
             "custom_components.hacs_refresh.HacsRefreshRuntimeData.async_initialize",
