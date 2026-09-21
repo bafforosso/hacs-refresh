@@ -60,6 +60,9 @@
     "hacs_unavailable": {
       "message": "HACS is not available."
     },
+    "min_ha_version": {
+      "message": "Home Assistant {version} or newer is required."
+    },
     "refresh_in_progress": {
       "message": "A HACS refresh is already in progress."
     },

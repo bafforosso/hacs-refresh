@@ -150,3 +150,10 @@ Its `attributes` provide further details about the refresh:
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.
+
+## License
+
+Copyright © 2026 Frédéric Rouge
+
+HACS Refresh is licensed under the GNU General Public License v3.0 or later.
+See the [LICENSE](LICENSE) file for the full license text.

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from awesomeversion import AwesomeVersion
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import __version__ as HAVERSION
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -12,6 +14,7 @@ from homeassistant.core import (
     SupportsResponse,
 )
 from homeassistant.exceptions import (
+    ConfigEntryError,
     ConfigEntryNotReady,
     ServiceValidationError,
 )
@@ -19,6 +22,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import (
     DOMAIN,
+    MIN_HA_VERSION,
     REFRESH_SOURCE_MANUAL,
     SERVICE_REFRESH,
 )
@@ -82,6 +86,13 @@ async def async_setup_entry(
     entry: HacsRefreshConfigEntry,
 ) -> bool:
     """Set up HACS Refresh from a config entry."""
+    if AwesomeVersion(HAVERSION) < AwesomeVersion(MIN_HA_VERSION):
+        raise ConfigEntryError(
+            translation_domain=DOMAIN,
+            translation_key="min_ha_version",
+            translation_placeholders={"version": MIN_HA_VERSION},
+        )
+
     if hass.data.get("hacs") is None:
         raise ConfigEntryNotReady("HACS is not available yet")
 
