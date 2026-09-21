@@ -1,8 +1,8 @@
-name: Test upcoming Home Assistant
+name: Test Home Assistant beta
 
 on:
   schedule:
-    - cron: "0 12 * * 4"
+    - cron: "15 11 * * 5"
   workflow_dispatch:
 
 concurrency:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test:
-    name: Pytest - Python 3.14 / upcoming HA
+    name: Pytest - Python 3.14 / HA beta
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +30,7 @@ jobs:
       - name: Check Home Assistant version
         id: home-assistant
         run: |
-          version="$(
+          ha_version="$(
             uv run --isolated --no-project \
               --python 3.14 \
               --with pytest \
@@ -38,8 +38,18 @@ jobs:
               python -c 'from importlib.metadata import version; print(version("homeassistant"))'
           )"
 
-          echo "Home Assistant version: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          phacc_version="$(
+            uv run --isolated --no-project \
+              --python 3.14 \
+              --with pytest \
+              --with pytest-homeassistant-custom-component \
+              python -c 'from importlib.metadata import version; print(version("pytest-homeassistant-custom-component"))'
+          )"
+
+          echo "Home Assistant version: $ha_version"
+          echo "pytest-homeassistant-custom-component version: $phacc_version"
+
+          echo "version=$ha_version" >> "$GITHUB_OUTPUT"
 
       - name: Run tests against Home Assistant beta
         if: contains(steps.home-assistant.outputs.version, 'b')
