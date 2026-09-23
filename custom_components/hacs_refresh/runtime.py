@@ -255,7 +255,13 @@ class HacsRefreshRuntimeData:
             self.last_completed = dt_util.now()
             self.last_result = EVENT_TYPE_FAILED
             self.last_source = source
-            self.last_message = str(err)
+
+            error = HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unexpected_refresh_error",
+            )
+            self.last_message = str(error)
+
             self.last_duration = duration
             self.last_repositories = 0
             self.last_successful = 0
@@ -269,10 +275,7 @@ class HacsRefreshRuntimeData:
                 _LOGGER.exception("Scheduled HACS refresh failed")
                 return None
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="unexpected_refresh_error",
-            ) from err
+            raise error from err
         else:
             duration = perf_counter() - start
 

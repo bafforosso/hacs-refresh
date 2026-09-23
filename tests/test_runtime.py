@@ -574,9 +574,11 @@ def test_runtime_event_listener_can_be_added_and_removed(
 async def test_refresh_fails_on_unexpected_error(
     hass: HomeAssistant,
 ) -> None:
-    """Test that unexpected refresh errors are recorded correctly."""
+    """Test that unexpected refresh errors are recorded without exposing details."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+    runtime.add_event_listener(listener)
 
     completed = datetime(
         2026,
@@ -618,6 +620,10 @@ async def test_refresh_fails_on_unexpected_error(
     ):
         await runtime.async_refresh(source="manual")
 
+    expected_error = HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="unexpected_refresh_error",
+    )
     assert exc_info.value.translation_domain == DOMAIN
     assert exc_info.value.translation_key == "unexpected_refresh_error"
     assert exc_info.value.translation_placeholders is None
@@ -626,7 +632,8 @@ async def test_refresh_fails_on_unexpected_error(
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_FAILED
     assert runtime.last_source == "manual"
-    assert runtime.last_message == "Something went wrong"
+    assert runtime.last_message == str(expected_error)
+    assert runtime.last_message != str(unexpected_error)
     assert runtime.last_duration == 2.5
     assert runtime.last_repositories == 0
     assert runtime.last_successful == 0
@@ -635,12 +642,20 @@ async def test_refresh_fails_on_unexpected_error(
     assert runtime.last_completed is not None
     assert runtime.last_completed == new_completed
 
+    listener.assert_called_once()
+    assert listener.call_args.args[0] == EVENT_TYPE_FAILED
+    assert listener.call_args.args[1]["source"] == "manual"
+    assert listener.call_args.args[1]["message"] == str(expected_error)
+    assert listener.call_args.args[1]["message"] != str(unexpected_error)
+    assert listener.call_args.args[1]["duration"] == runtime.last_duration
+
     stored = await runtime._store.async_load()
     assert stored is not None
     assert stored["completed"] == runtime.last_completed.isoformat()
     assert stored["result"] == EVENT_TYPE_FAILED
     assert stored["source"] == "manual"
-    assert stored["message"] == "Something went wrong"
+    assert stored["message"] == str(expected_error)
+    assert stored["message"] != str(unexpected_error)
     assert stored["duration"] == 2.5
     assert stored["repositories"] == 0
     assert stored["successful"] == 0
@@ -733,6 +748,7 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
     listener = MagicMock()
+    runtime.add_event_listener(listener)
 
     new_completed = datetime(
         2026,
@@ -742,8 +758,6 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
         30,
         tzinfo=UTC,
     )
-
-    runtime.add_event_listener(listener)
 
     unexpected_error = RuntimeError("Something went wrong")
     with (
@@ -764,10 +778,15 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     ):
         await runtime.async_refresh(source="scheduled")
 
+    expected_error = HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="unexpected_refresh_error",
+    )
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_FAILED
     assert runtime.last_source == "scheduled"
-    assert runtime.last_message == "Something went wrong"
+    assert runtime.last_message == str(expected_error)
+    assert runtime.last_message != str(unexpected_error)
     assert runtime.last_completed is not None
     assert runtime.last_completed == new_completed
     assert runtime.last_duration == 2.5
@@ -779,10 +798,12 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     listener.assert_called_once()
     assert listener.call_args.args[0] == EVENT_TYPE_FAILED
     assert listener.call_args.args[1]["source"] == "scheduled"
-    assert listener.call_args.args[1]["message"] == "Something went wrong"
+    assert listener.call_args.args[1]["message"] == str(expected_error)
+    assert listener.call_args.args[1]["message"] != str(unexpected_error)
     assert listener.call_args.args[1]["duration"] == runtime.last_duration
 
     assert "Scheduled HACS refresh failed" in caplog.text
+    assert str(unexpected_error) in caplog.text
 
 
 async def test_manual_refresh_is_skipped_when_queue_is_busy(
