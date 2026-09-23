@@ -113,7 +113,10 @@ async def test_refresh_service_returns_response_data(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=7,
             successful=5,
+            failed=1,
+            pending=1,
             duration=2.5,
         )
     )
@@ -133,7 +136,10 @@ async def test_refresh_service_returns_response_data(
         )
 
     assert response == {
+        "repositories": 7,
         "successful": 5,
+        "failed": 1,
+        "pending": 1,
         "duration": 2.5,
     }
     runtime.async_refresh.assert_awaited_once_with(source="manual")
@@ -148,7 +154,10 @@ async def test_refresh_service_does_not_return_response_data_by_default(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=5,
             successful=5,
+            failed=0,
+            pending=0,
             duration=2.5,
         )
     )

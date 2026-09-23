@@ -46,10 +46,23 @@ type RefreshEventListener = Callable[[str, dict[str, Any]], None]
 
 @dataclass(frozen=True, slots=True)
 class HacsRefreshOutcome:
-    """Result of a successfully completed HACS refresh."""
+    """Result of a completed HACS refresh."""
 
+    repositories: int
     successful: int
+    failed: int
+    pending: int
     duration: float
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the outcome as action response data."""
+        return {
+            "repositories": self.repositories,
+            "successful": self.successful,
+            "failed": self.failed,
+            "pending": self.pending,
+            "duration": self.duration,
+        }
 
 
 class HacsRefreshRuntimeData:
@@ -132,18 +145,17 @@ class HacsRefreshRuntimeData:
 
         return remove_listener
 
-    def _notify_refresh_completed(self) -> None:
+    def _notify_refresh_completed(
+        self,
+        outcome: HacsRefreshOutcome,
+    ) -> None:
         """Notify listeners that a refresh has completed."""
         if self.last_result is None:
             return
 
-        event_data = {
+        event_data: dict[str, Any] = {
             "source": self.last_source,
-            "repositories": self.last_repositories,
-            "successful": self.last_successful,
-            "failed": self.last_failed,
-            "pending": self.last_pending,
-            "duration": self.last_duration,
+            **outcome.as_dict(),
         }
         if self.last_message is not None:
             event_data["message"] = self.last_message
@@ -262,20 +274,28 @@ class HacsRefreshRuntimeData:
             )
             self.last_message = str(error)
 
-            self.last_duration = duration
-            self.last_repositories = 0
-            self.last_successful = 0
-            self.last_failed = 0
-            self.last_pending = 0
+            outcome = HacsRefreshOutcome(
+                repositories=0,
+                successful=0,
+                failed=0,
+                pending=0,
+                duration=duration,
+            )
+            self.last_duration = outcome.duration
+            self.last_repositories = outcome.repositories
+            self.last_successful = outcome.successful
+            self.last_failed = outcome.failed
+            self.last_pending = outcome.pending
 
             await self._async_save_last_refresh()
-            self._notify_refresh_completed()
+            self._notify_refresh_completed(outcome)
 
             if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.exception("Scheduled HACS refresh failed")
                 return None
 
             raise error from err
+
         else:
             duration = perf_counter() - start
 
@@ -322,58 +342,61 @@ class HacsRefreshRuntimeData:
         duration: float,
     ) -> HacsRefreshOutcome:
         """Update runtime state from a HACS refresh result."""
+        outcome = HacsRefreshOutcome(
+            repositories=result.repositories,
+            successful=result.successful,
+            failed=result.failed,
+            pending=result.pending,
+            duration=duration,
+        )
+
         self.state = STATE_IDLE
         self.last_completed = dt_util.now()
         self.last_source = source
-        self.last_repositories = result.repositories
-        self.last_successful = result.successful
-        self.last_failed = result.failed
-        self.last_pending = result.pending
-        self.last_duration = duration
+        self.last_repositories = outcome.repositories
+        self.last_successful = outcome.successful
+        self.last_failed = outcome.failed
+        self.last_pending = outcome.pending
+        self.last_duration = outcome.duration
 
-        if result.pending:
+        if outcome.pending:
             self.last_result = EVENT_TYPE_PARTIAL
             self.last_message = (
-                f"{result.pending} repository refresh task(s) remain pending"
+                f"{outcome.pending} repository refresh task(s) remain pending"
             )
-        elif result.failed:
+        elif outcome.failed:
             self.last_result = EVENT_TYPE_FAILED
-            self.last_message = f"{result.failed} repository refresh task(s) failed"
+            self.last_message = f"{outcome.failed} repository refresh task(s) failed"
         else:
             self.last_result = EVENT_TYPE_SUCCESS
             self.last_message = None
 
         await self._async_save_last_refresh()
 
-        self._notify_refresh_completed()
+        self._notify_refresh_completed(outcome)
 
-        outcome = HacsRefreshOutcome(
-            successful=result.successful,
-            duration=duration,
-        )
-
-        if result.repositories == 0:
+        if outcome.repositories == 0:
             _LOGGER.info("No installed HACS repositories found")
             return outcome
 
-        if result.pending:
+        if outcome.pending:
             _LOGGER.warning(
                 "HACS refresh finished with %d repositories still pending "
                 "in the HACS queue",
-                result.pending,
+                outcome.pending,
             )
 
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="refresh_tasks_pending",
-                translation_placeholders={"pending": str(result.pending)},
+                translation_placeholders={"pending": str(outcome.pending)},
             )
 
-        if result.failed:
+        if outcome.failed:
             _LOGGER.error(
                 "HACS refresh failed for %d of %d repositories",
-                result.failed,
-                result.repositories,
+                outcome.failed,
+                outcome.repositories,
             )
 
             for failure in result.failures:
@@ -386,13 +409,13 @@ class HacsRefreshRuntimeData:
                 translation_domain=DOMAIN,
                 translation_key="refresh_tasks_failed",
                 translation_placeholders={
-                    "failed": str(result.failed),
-                    "repositories": str(result.repositories),
+                    "failed": str(outcome.failed),
+                    "repositories": str(outcome.repositories),
                 },
             )
 
         _LOGGER.debug(
             "HACS forced refresh completed successfully for %d repositories",
-            result.repositories,
+            outcome.repositories,
         )
         return outcome

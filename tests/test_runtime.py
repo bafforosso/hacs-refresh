@@ -21,6 +21,7 @@ from custom_components.hacs_refresh.hacs import (
     HacsUnavailableError,
 )
 from custom_components.hacs_refresh.runtime import (
+    HacsRefreshOutcome,
     HacsRefreshRuntimeData,
     HacsRefreshSkipped,
 )
@@ -261,7 +262,10 @@ async def test_refresh_succeeds(
 
     mock_refresh.assert_awaited_once_with()
     assert outcome is not None
+    assert outcome.repositories == 1
     assert outcome.successful == 1
+    assert outcome.failed == 0
+    assert outcome.pending == 0
     assert outcome.duration == 2.5
 
     assert runtime.state == "idle"
@@ -450,32 +454,47 @@ async def test_refresh_handles_cancellation_during_persistence(
     assert stored["pending"] == 0
 
 
-async def test_refresh_duration_is_propagated_to_event(
+async def test_refresh_outcome_is_propagated_to_event(
     hass: HomeAssistant,
 ) -> None:
-    """Test that refresh duration is included in the completion event."""
+    """Test that the refresh outcome is included in the completion event."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     listener = MagicMock()
     runtime.add_event_listener(listener)
-
+    refresh_result = _refresh_result(
+        repositories=4,
+        successful=2,
+        failed=1,
+        pending=1,
+    )
     with (
         patch.object(
             runtime.hacs,
             "async_refresh",
             new_callable=AsyncMock,
-            return_value=_refresh_result(),
+            return_value=refresh_result,
         ),
         patch(
             "custom_components.hacs_refresh.runtime.perf_counter",
             side_effect=[10.0, 12.5],
         ),
+        pytest.raises(HomeAssistantError),
     ):
         await runtime.async_refresh(source="manual")
 
     listener.assert_called_once()
-    assert listener.call_args.args[1]["duration"] == 2.5
+    event_data = listener.call_args.args[1]
+    assert event_data == {
+        "source": "manual",
+        "repositories": 4,
+        "successful": 2,
+        "failed": 1,
+        "pending": 1,
+        "duration": 2.5,
+        "message": "1 repository refresh task(s) remain pending",
+    }
 
 
 @pytest.mark.parametrize(
@@ -540,18 +559,28 @@ def test_runtime_event_listener_can_be_added_and_removed(
 
     remove_listener = runtime.add_event_listener(listener)
 
-    runtime._notify_refresh_completed()
+    runtime._notify_refresh_completed(
+        HacsRefreshOutcome(
+            repositories=1,
+            successful=1,
+            failed=0,
+            pending=0,
+            duration=2.5,
+        )
+    )
     listener.assert_not_called()
 
     runtime.last_result = EVENT_TYPE_SUCCESS
     runtime.last_source = "manual"
-    runtime.last_repositories = 1
-    runtime.last_successful = 1
-    runtime.last_failed = 0
-    runtime.last_pending = 0
-    runtime.last_duration = 2.5
+    outcome = HacsRefreshOutcome(
+        repositories=1,
+        successful=1,
+        failed=0,
+        pending=0,
+        duration=2.5,
+    )
 
-    runtime._notify_refresh_completed()
+    runtime._notify_refresh_completed(outcome)
 
     listener.assert_called_once_with(
         EVENT_TYPE_SUCCESS,
@@ -567,7 +596,7 @@ def test_runtime_event_listener_can_be_added_and_removed(
 
     remove_listener()
 
-    runtime._notify_refresh_completed()
+    runtime._notify_refresh_completed(outcome)
     listener.assert_called_once()
 
 
