@@ -18,6 +18,7 @@ def hacs() -> MagicMock:
 
     hacs.queue.running = False
     hacs.queue.pending_tasks = 0
+    hacs.queue.has_pending_tasks = False
 
     queued_tasks = []
 
@@ -31,6 +32,7 @@ def hacs() -> MagicMock:
         )
         queued_tasks.clear()
         hacs.queue.pending_tasks = 0
+        hacs.queue.has_pending_tasks = False
         return results
 
     hacs.queue.add = MagicMock(side_effect=add_to_queue)

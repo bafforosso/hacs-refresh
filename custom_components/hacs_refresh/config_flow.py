@@ -99,7 +99,7 @@ async def _validate_options(
 
     try:
         times = _parse_times(user_input.get(CONF_TIMES, ""))
-    except ValueError as err:
+    except (TypeError, ValueError) as err:
         raise SchemaFlowError("invalid_time") from err
 
     if automatic_refresh:

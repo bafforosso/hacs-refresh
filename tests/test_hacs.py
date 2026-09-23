@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.hacs_refresh.hacs import (
     HacsAdapter,
     HacsDisabledError,
-    HacsQueueRunningError,
+    HacsQueueBusyError,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -38,17 +38,28 @@ async def test_refresh_fails_when_hacs_is_disabled(
     hacs.async_process_queue.assert_not_awaited()
 
 
-async def test_refresh_fails_when_queue_is_running(
+@pytest.mark.parametrize(
+    ("queue_running", "queue_has_pending_tasks"),
+    [
+        (True, False),
+        (False, True),
+        (True, True),
+    ],
+)
+async def test_refresh_fails_when_queue_is_busy(
     hass: HomeAssistant,
     hacs: MagicMock,
+    queue_running: bool,
+    queue_has_pending_tasks: bool,
 ) -> None:
-    """Test that refresh fails when the HACS queue is already running."""
-    hacs.queue.running = True
+    """Test that refresh fails when the HACS queue is busy."""
+    hacs.queue.running = queue_running
+    hacs.queue.has_pending_tasks = queue_has_pending_tasks
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
 
-    with pytest.raises(HacsQueueRunningError):
+    with pytest.raises(HacsQueueBusyError):
         await adapter.async_refresh()
 
     hacs.async_process_queue.assert_not_awaited()

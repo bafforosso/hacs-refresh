@@ -54,8 +54,8 @@
     "hacs_disabled": {
       "message": "HACS is disabled."
     },
-    "hacs_queue_running": {
-      "message": "The HACS queue is already running."
+    "hacs_queue_busy": {
+      "message": "The HACS queue is busy."
     },
     "hacs_unavailable": {
       "message": "HACS is not available."

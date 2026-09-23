@@ -28,7 +28,7 @@ from .const import (
 from .hacs import (
     HacsAdapter,
     HacsDisabledError,
-    HacsQueueRunningError,
+    HacsQueueBusyError,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -218,6 +218,7 @@ class HacsRefreshRuntimeData:
         self.notify_listeners()
 
         start = perf_counter()
+
         try:
             result = await self.hacs.async_refresh()
         except asyncio.CancelledError:
@@ -235,19 +236,18 @@ class HacsRefreshRuntimeData:
                 translation_domain=DOMAIN,
                 translation_key="hacs_disabled",
             ) from err
-        except HacsQueueRunningError as err:
+        except HacsQueueBusyError as err:
             self.state = STATE_IDLE
 
             if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.warning(
-                    "Scheduled HACS refresh skipped because the HACS queue "
-                    "is already running"
+                    "Scheduled HACS refresh skipped because the HACS queue is busy"
                 )
                 return None
 
             raise HacsRefreshSkipped(
                 translation_domain=DOMAIN,
-                translation_key="hacs_queue_running",
+                translation_key="hacs_queue_busy",
             ) from err
         except Exception as err:
             duration = perf_counter() - start
@@ -255,12 +255,19 @@ class HacsRefreshRuntimeData:
             self.last_completed = dt_util.now()
             self.last_result = EVENT_TYPE_FAILED
             self.last_source = source
-            self.last_message = str(err)
+
+            error = HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unexpected_refresh_error",
+            )
+            self.last_message = str(error)
+
             self.last_duration = duration
             self.last_repositories = 0
             self.last_successful = 0
             self.last_failed = 0
             self.last_pending = 0
+
             await self._async_save_last_refresh()
             self._notify_refresh_completed()
 
@@ -268,10 +275,7 @@ class HacsRefreshRuntimeData:
                 _LOGGER.exception("Scheduled HACS refresh failed")
                 return None
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="unexpected_refresh_error",
-            ) from err
+            raise error from err
         else:
             duration = perf_counter() - start
 

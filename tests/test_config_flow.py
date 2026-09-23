@@ -310,6 +310,27 @@ async def test_validate_options_rejects_times_too_close() -> None:
         )
 
 
+async def test_validate_options_rejects_non_string_time() -> None:
+    """Test that non-string time input raises the expected flow error."""
+    handler = MagicMock()
+    handler.options = {}
+
+    user_input = {
+        CONF_AUTOMATIC_REFRESH: True,
+        CONF_DAYS: ["mon"],
+        CONF_TIMES: None,
+    }
+
+    with pytest.raises(
+        SchemaFlowError,
+        match="invalid_time",
+    ):
+        await _validate_options(
+            handler,
+            user_input,
+        )
+
+
 async def test_suggested_values_formats_stored_times() -> None:
     """Test that stored options are converted to form values."""
     handler = MagicMock()

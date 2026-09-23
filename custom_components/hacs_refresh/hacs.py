@@ -16,8 +16,8 @@ class HacsDisabledError(Exception):
     """Raised when HACS is disabled."""
 
 
-class HacsQueueRunningError(Exception):
-    """Raised when the HACS queue is already running."""
+class HacsQueueBusyError(Exception):
+    """Raised when the HACS queue is busy."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,8 +54,8 @@ class HacsAdapter:
         """Refresh all installed HACS repositories."""
         hacs = self._get_hacs()
 
-        if hacs.queue.running:
-            raise HacsQueueRunningError
+        if hacs.queue.running or hacs.queue.has_pending_tasks:
+            raise HacsQueueBusyError
 
         repositories = list(hacs.repositories.list_downloaded)
 
