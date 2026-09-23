@@ -52,6 +52,8 @@ class HacsRefreshOutcome:
     successful: int
     failed: int
     pending: int
+    failed_repositories: tuple[str, ...]
+    pending_repositories: tuple[str, ...]
     duration: float
 
     def as_dict(self) -> dict[str, Any]:
@@ -61,6 +63,8 @@ class HacsRefreshOutcome:
             "successful": self.successful,
             "failed": self.failed,
             "pending": self.pending,
+            "failed_repositories": list(self.failed_repositories),
+            "pending_repositories": list(self.pending_repositories),
             "duration": self.duration,
         }
 
@@ -279,6 +283,8 @@ class HacsRefreshRuntimeData:
                 successful=0,
                 failed=0,
                 pending=0,
+                failed_repositories=(),
+                pending_repositories=(),
                 duration=duration,
             )
             self.last_duration = outcome.duration
@@ -347,6 +353,8 @@ class HacsRefreshRuntimeData:
             successful=result.successful,
             failed=result.failed,
             pending=result.pending,
+            failed_repositories=result.failed_repositories,
+            pending_repositories=result.pending_repositories,
             duration=duration,
         )
 

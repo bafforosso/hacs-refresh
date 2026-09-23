@@ -71,10 +71,10 @@ async def test_refresh_succeeds(
 ) -> None:
     """Test a successful HACS refresh."""
     repository = MagicMock()
+    repository.data.full_name = "example/successful-repository"
     repository.update_repository = AsyncMock(return_value="update")
 
     hacs.repositories.list_downloaded = [repository]
-    hacs.queue.pending_tasks = 0
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
@@ -85,6 +85,8 @@ async def test_refresh_succeeds(
         successful=1,
         failed=0,
         pending=0,
+        failed_repositories=(),
+        pending_repositories=(),
         failures=(),
     )
 
@@ -113,6 +115,8 @@ async def test_refresh_succeeds_with_no_repositories(
         successful=0,
         failed=0,
         pending=0,
+        failed_repositories=(),
+        pending_repositories=(),
         failures=(),
     )
 
@@ -125,30 +129,44 @@ async def test_refresh_reports_pending_repositories(
     hass: HomeAssistant,
     hacs: MagicMock,
 ) -> None:
-    """Test that pending repository refreshes are reported correctly."""
-    repository = MagicMock()
-    repository.update_repository = AsyncMock()
+    """Test that unprocessed repositories are reported as pending."""
+    processed_repository = MagicMock()
+    processed_repository.data.full_name = "example/processed-repository"
+    processed_repository.update_repository = AsyncMock()
 
-    hacs.repositories.list_downloaded = [repository]
+    pending_repository = MagicMock()
+    pending_repository.data.full_name = "example/pending-repository"
+    pending_repository.update_repository = AsyncMock()
+
+    hacs.repositories.list_downloaded = [
+        processed_repository,
+        pending_repository,
+    ]
     hass.data["hacs"] = hacs
 
     async def process_queue() -> None:
-        await hacs.queue.add.call_args.args[0]
-        hacs.queue.pending_tasks = 1
+        await hacs.queue.add.call_args_list[0].args[0]
 
     hacs.async_process_queue = AsyncMock(side_effect=process_queue)
 
     adapter = HacsAdapter(hass)
     result = await adapter.async_refresh()
 
+    pending_task = hacs.queue.add.call_args_list[1].args[0]
+
     assert result == HacsRefreshResult(
-        repositories=1,
+        repositories=2,
         successful=1,
         failed=0,
         pending=1,
+        failed_repositories=(),
+        pending_repositories=("example/pending-repository",),
         failures=(),
     )
 
+    assert processed_repository.update_repository.await_count == 1
+    pending_repository.update_repository.assert_not_awaited()
+    pending_task.close()
     hacs.data.async_write.assert_awaited_once()
 
 
@@ -158,19 +176,19 @@ async def test_refresh_reports_repository_failure(
 ) -> None:
     """Test that repository refresh failures are reported correctly."""
     successful_repository = MagicMock()
+    successful_repository.data.full_name = "example/successful-repository"
     successful_repository.update_repository = AsyncMock()
 
     failed_repository = MagicMock()
+    failed_repository.data.full_name = "example/failed-repository"
     failed_repository.update_repository = AsyncMock(
         side_effect=RuntimeError("Something went wrong")
     )
-    failed_repository.data.full_name = "example/failed-repository"
 
     hacs.repositories.list_downloaded = [
         successful_repository,
         failed_repository,
     ]
-    hacs.queue.pending_tasks = 0
     hass.data["hacs"] = hacs
 
     adapter = HacsAdapter(hass)
@@ -181,6 +199,8 @@ async def test_refresh_reports_repository_failure(
         successful=1,
         failed=1,
         pending=0,
+        failed_repositories=("example/failed-repository",),
+        pending_repositories=(),
         failures=("example/failed-repository: Something went wrong",),
     )
 

@@ -79,12 +79,24 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 
 A manual refresh can be triggered using the **Refresh** button.
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the number of successfully refreshed repositories and the refresh duration when response data is requested.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the total repository count, successful, failed, and pending counts, the names of repositories that failed or were not processed, and the refresh duration.
 
 ```yaml
 action: hacs_refresh.refresh
 response_variable: refresh_result
 ```
+
+The response `data` contains:
+
+| Field | Type | Description |
+| --- | :---: | --- |
+| `repositories` | `int` | Total number of repositories included in the refresh. |
+| `successful` | `int` | Number of repositories refreshed successfully. |
+| `failed` | `int` | Number of repositories that failed to refresh. |
+| `pending` | `int` | Number of repositories that were not processed. |
+| `failed_repositories` | `list[str]` | Full names of repositories that failed to refresh. |
+| `pending_repositories` | `list[str]` | Full names of repositories that were not processed. |
+| `duration` | `float` | Refresh duration in seconds. |
 
 Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
@@ -147,6 +159,8 @@ Its `attributes` provide further details about the refresh:
 | `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
 | `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
+| `failed_repositories` | `list[str]` | Always | Repository full names | Repositories that failed to refresh. |
+| `pending_repositories` | `list[str]` | Always | Repository full names | Repositories that were not processed. |
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.

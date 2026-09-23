@@ -117,6 +117,8 @@ async def test_refresh_service_returns_response_data(
             successful=5,
             failed=1,
             pending=1,
+            failed_repositories=("example/failed-repository",),
+            pending_repositories=("example/pending-repository",),
             duration=2.5,
         )
     )
@@ -140,6 +142,12 @@ async def test_refresh_service_returns_response_data(
         "successful": 5,
         "failed": 1,
         "pending": 1,
+        "failed_repositories": [
+            "example/failed-repository",
+        ],
+        "pending_repositories": [
+            "example/pending-repository",
+        ],
         "duration": 2.5,
     }
     runtime.async_refresh.assert_awaited_once_with(source="manual")
@@ -158,6 +166,8 @@ async def test_refresh_service_does_not_return_response_data_by_default(
             successful=5,
             failed=0,
             pending=0,
+            failed_repositories=(),
+            pending_repositories=(),
             duration=2.5,
         )
     )

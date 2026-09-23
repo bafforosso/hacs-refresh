@@ -34,6 +34,8 @@ def _refresh_result(
     successful: int = 1,
     failed: int = 0,
     pending: int = 0,
+    failed_repositories: tuple[str, ...] = (),
+    pending_repositories: tuple[str, ...] = (),
     failures: tuple[str, ...] = (),
 ) -> HacsRefreshResult:
     """Create a refresh result for testing."""
@@ -42,6 +44,8 @@ def _refresh_result(
         successful=successful,
         failed=failed,
         pending=pending,
+        failed_repositories=failed_repositories,
+        pending_repositories=pending_repositories,
         failures=failures,
     )
 
@@ -266,6 +270,8 @@ async def test_refresh_succeeds(
     assert outcome.successful == 1
     assert outcome.failed == 0
     assert outcome.pending == 0
+    assert outcome.failed_repositories == ()
+    assert outcome.pending_repositories == ()
     assert outcome.duration == 2.5
 
     assert runtime.state == "idle"
@@ -468,6 +474,8 @@ async def test_refresh_outcome_is_propagated_to_event(
         successful=2,
         failed=1,
         pending=1,
+        failed_repositories=("example/failed-repository",),
+        pending_repositories=("example/pending-repository",),
     )
     with (
         patch.object(
@@ -492,6 +500,12 @@ async def test_refresh_outcome_is_propagated_to_event(
         "successful": 2,
         "failed": 1,
         "pending": 1,
+        "failed_repositories": [
+            "example/failed-repository",
+        ],
+        "pending_repositories": [
+            "example/pending-repository",
+        ],
         "duration": 2.5,
         "message": "1 repository refresh task(s) remain pending",
     }
@@ -502,9 +516,10 @@ async def test_refresh_outcome_is_propagated_to_event(
     [
         (
             _refresh_result(
-                repositories=1,
+                repositories=2,
                 successful=1,
                 pending=1,
+                pending_repositories=("example/pending-repository",),
             ),
             EVENT_TYPE_PARTIAL,
             "1 repository refresh task(s) remain pending",
@@ -514,6 +529,7 @@ async def test_refresh_outcome_is_propagated_to_event(
                 repositories=2,
                 successful=1,
                 failed=1,
+                failed_repositories=("example/failed-repository",),
                 failures=("example/failed-repository: Something went wrong",),
             ),
             EVENT_TYPE_FAILED,
@@ -565,6 +581,8 @@ def test_runtime_event_listener_can_be_added_and_removed(
             successful=1,
             failed=0,
             pending=0,
+            failed_repositories=(),
+            pending_repositories=(),
             duration=2.5,
         )
     )
@@ -577,6 +595,8 @@ def test_runtime_event_listener_can_be_added_and_removed(
         successful=1,
         failed=0,
         pending=0,
+        failed_repositories=(),
+        pending_repositories=(),
         duration=2.5,
     )
 
@@ -590,6 +610,8 @@ def test_runtime_event_listener_can_be_added_and_removed(
             "successful": 1,
             "failed": 0,
             "pending": 0,
+            "failed_repositories": [],
+            "pending_repositories": [],
             "duration": 2.5,
         },
     )
