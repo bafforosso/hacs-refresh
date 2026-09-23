@@ -16,7 +16,7 @@ from custom_components.hacs_refresh.const import (
 )
 from custom_components.hacs_refresh.hacs import (
     HacsDisabledError,
-    HacsQueueRunningError,
+    HacsQueueBusyError,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -785,10 +785,10 @@ async def test_scheduled_refresh_suppresses_unexpected_error(
     assert "Scheduled HACS refresh failed" in caplog.text
 
 
-async def test_manual_refresh_is_skipped_when_queue_is_running(
+async def test_manual_refresh_is_skipped_when_queue_is_busy(
     hass: HomeAssistant,
 ) -> None:
-    """Test that a manual refresh is skipped when the HACS queue is running."""
+    """Test that a manual refresh is skipped when the HACS queue is busy."""
     entry = MockConfigEntry(domain=DOMAIN)
 
     runtime = HacsRefreshRuntimeData(hass, entry)
@@ -798,14 +798,14 @@ async def test_manual_refresh_is_skipped_when_queue_is_running(
             runtime.hacs,
             "async_refresh",
             new_callable=AsyncMock,
-            side_effect=HacsQueueRunningError,
+            side_effect=HacsQueueBusyError,
         ),
         pytest.raises(HacsRefreshSkipped) as exc_info,
     ):
         await runtime.async_refresh(source="manual")
 
     assert exc_info.value.translation_domain == DOMAIN
-    assert exc_info.value.translation_key == "hacs_queue_running"
+    assert exc_info.value.translation_key == "hacs_queue_busy"
     assert exc_info.value.translation_placeholders is None
     assert runtime.state == "idle"
 
@@ -843,11 +843,11 @@ async def test_scheduled_refresh_is_skipped_when_refresh_is_in_progress(
     )
 
 
-async def test_scheduled_refresh_is_skipped_when_queue_is_running(
+async def test_scheduled_refresh_is_skipped_when_queue_is_busy(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that a scheduled refresh is skipped when the HACS queue is running."""
+    """Test that a scheduled refresh is skipped when the HACS queue is busy."""
     entry = MockConfigEntry(domain=DOMAIN)
 
     runtime = HacsRefreshRuntimeData(hass, entry)
@@ -856,7 +856,7 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
         runtime.hacs,
         "async_refresh",
         new_callable=AsyncMock,
-        side_effect=HacsQueueRunningError,
+        side_effect=HacsQueueBusyError,
     ) as mock_refresh:
         await runtime.async_refresh(source="scheduled")
 
@@ -864,8 +864,7 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_running(
 
     assert runtime.state == "idle"
     assert (
-        "Scheduled HACS refresh skipped because the HACS queue is already running"
-        in caplog.text
+        "Scheduled HACS refresh skipped because the HACS queue is busy" in caplog.text
     )
 
 

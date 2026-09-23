@@ -54,8 +54,8 @@
     "hacs_disabled": {
       "message": "HACS est désactivé."
     },
-    "hacs_queue_running": {
-      "message": "La file d’attente d’HACS est déjà en cours d’exécution."
+    "hacs_queue_busy": {
+      "message": "La file d’attente d’HACS est occupée."
     },
     "hacs_unavailable": {
       "message": "HACS n’est pas disponible."
