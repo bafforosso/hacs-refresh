@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,6 +34,24 @@ class HacsRefreshResult:
     failures: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class HacsRefreshProgress:
+    """Progress of a HACS repository refresh."""
+
+    total: int
+    processed: int
+    successful: int
+    failed: int
+
+    @property
+    def remaining(self) -> int:
+        """Return the number of repositories that remain unprocessed."""
+        return self.total - self.processed
+
+
+type HacsRefreshProgressCallback = Callable[[HacsRefreshProgress], None]
+
+
 class HacsAdapter:
     """Adapter around the HACS integration."""
 
@@ -52,7 +71,11 @@ class HacsAdapter:
 
         return hacs
 
-    async def async_refresh(self) -> HacsRefreshResult:
+    async def async_refresh(
+        self,
+        *,
+        progress_callback: HacsRefreshProgressCallback | None = None,
+    ) -> HacsRefreshResult:
         """Refresh all installed HACS repositories."""
         hacs = self._get_hacs()
 
@@ -60,6 +83,24 @@ class HacsAdapter:
             raise HacsQueueBusyError
 
         repositories = list(hacs.repositories.list_downloaded)
+
+        processed = 0
+        successful = 0
+        failed = 0
+
+        def report_progress() -> None:
+            """Report the current refresh progress."""
+            if progress_callback is not None:
+                progress_callback(
+                    HacsRefreshProgress(
+                        total=len(repositories),
+                        processed=processed,
+                        successful=successful,
+                        failed=failed,
+                    )
+                )
+
+        report_progress()
 
         if not repositories:
             return HacsRefreshResult(
@@ -82,6 +123,7 @@ class HacsAdapter:
             repository_name: str,
         ) -> None:
             """Refresh one repository and record its result."""
+            nonlocal processed, successful, failed
 
             try:
                 await repository.update_repository(
@@ -91,9 +133,15 @@ class HacsAdapter:
             except Exception as err:
                 repository_statuses[index] = False
                 failures.append(f"{repository_name}: {err}")
+                failed += 1
+                processed += 1
+                report_progress()
                 raise
             else:
                 repository_statuses[index] = True
+                successful += 1
+                processed += 1
+                report_progress()
 
         for index, repository in enumerate(repositories):
             repository_name = getattr(

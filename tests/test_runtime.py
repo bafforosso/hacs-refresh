@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,10 +14,13 @@ from custom_components.hacs_refresh.const import (
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
     MIN_REFRESH_INTERVAL,
+    STATE_IDLE,
+    STATE_REFRESHING,
 )
 from custom_components.hacs_refresh.hacs import (
     HacsDisabledError,
     HacsQueueBusyError,
+    HacsRefreshProgress,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -264,7 +268,7 @@ async def test_refresh_succeeds(
     ):
         outcome = await runtime.async_refresh(source="manual")
 
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
     assert outcome is not None
     assert outcome.repositories == 1
     assert outcome.successful == 1
@@ -297,6 +301,74 @@ async def test_refresh_succeeds(
     assert stored["successful"] == 1
     assert stored["failed"] == 0
     assert stored["pending"] == 0
+
+
+async def test_refresh_tracks_progress(
+    hass: HomeAssistant,
+) -> None:
+    """Test that runtime tracks HACS Refresh progress."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    runtime_states: list[str] = []
+
+    def runtime_listener() -> None:
+        runtime_states.append(runtime.state)
+
+    runtime.add_listener(runtime_listener)
+
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+    ) -> HacsRefreshResult:
+        progress_callback(
+            HacsRefreshProgress(
+                total=2,
+                processed=0,
+                successful=0,
+                failed=0,
+            )
+        )
+        progress_callback(
+            HacsRefreshProgress(
+                total=2,
+                processed=1,
+                successful=1,
+                failed=0,
+            )
+        )
+        progress_callback(
+            HacsRefreshProgress(
+                total=2,
+                processed=2,
+                successful=2,
+                failed=0,
+            )
+        )
+        return _refresh_result(
+            repositories=2,
+            successful=2,
+        )
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new=async_refresh,
+    ):
+        outcome = await runtime.async_refresh(source="manual")
+
+    assert outcome is not None
+    assert outcome.repositories == 2
+    assert outcome.successful == 2
+    assert runtime.refresh_progress == HacsRefreshProgress(
+        total=2,
+        processed=2,
+        successful=2,
+        failed=0,
+    )
+
+    # Progress updates must not notify the existing runtime listeners.
+    assert runtime_states == [STATE_REFRESHING, STATE_IDLE]
 
 
 async def test_refresh_notifies_runtime_listeners_after_lock_is_released(
@@ -355,7 +427,10 @@ async def test_refresh_handles_cancellation(
     def runtime_listener() -> None:
         refresh_states.append(runtime.refresh_in_progress)
 
-    async def async_refresh() -> HacsRefreshResult:
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+    ) -> HacsRefreshResult:
         refresh_started.set()
         await asyncio.Event().wait()
         return _refresh_result()
@@ -743,7 +818,10 @@ async def test_refresh_preserves_last_completed_state_while_running(
     refresh_started = asyncio.Event()
     release_refresh = asyncio.Event()
 
-    async def async_refresh() -> HacsRefreshResult:
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+    ) -> HacsRefreshResult:
         refresh_started.set()
         await release_refresh.wait()
         return _refresh_result()
@@ -932,7 +1010,7 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_busy(
     ) as mock_refresh:
         await runtime.async_refresh(source="scheduled")
 
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
 
     assert runtime.state == "idle"
     assert (
@@ -1034,7 +1112,7 @@ async def test_scheduled_refresh_is_allowed_at_minimum_interval(
 
         await runtime.async_refresh(source="scheduled")
 
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
 
 
 async def test_manual_refresh_bypasses_minimum_interval(
@@ -1069,7 +1147,7 @@ async def test_manual_refresh_bypasses_minimum_interval(
 
         await runtime.async_refresh(source="manual")
 
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
 
 
 async def test_scheduled_refresh_is_allowed_without_last_completed(
@@ -1089,7 +1167,7 @@ async def test_scheduled_refresh_is_allowed_without_last_completed(
 
     assert runtime.state == "idle"
     assert runtime.last_result == EVENT_TYPE_SUCCESS
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
@@ -1162,7 +1240,7 @@ async def test_refresh_succeeds_with_no_repositories(
     assert runtime.last_pending == 0
     assert runtime.last_message is None
 
-    mock_refresh.assert_awaited_once_with()
+    mock_refresh.assert_awaited_once()
 
 
 async def test_refresh_reports_pending_repositories(

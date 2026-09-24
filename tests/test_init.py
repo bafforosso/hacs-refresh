@@ -27,6 +27,7 @@ from custom_components.hacs_refresh.const import (
     MIN_HA_VERSION,
     SERVICE_REFRESH,
 )
+from custom_components.hacs_refresh.hacs import HacsRefreshProgress
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 
 
@@ -345,7 +346,10 @@ async def test_unload_entry_cancels_scheduled_refresh(
     refresh_cancelled = asyncio.Event()
     scheduled_callback: Callable[[datetime], Any] | None = None
 
-    async def async_refresh() -> None:
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+    ) -> None:
         """Keep the HACS refresh running until it is cancelled."""
         refresh_started.set()
 

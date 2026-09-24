@@ -11,7 +11,7 @@ from time import perf_counter
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
@@ -29,6 +29,7 @@ from .hacs import (
     HacsAdapter,
     HacsDisabledError,
     HacsQueueBusyError,
+    HacsRefreshProgress,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -86,6 +87,7 @@ class HacsRefreshRuntimeData:
         self._listeners: set[Callable[[], None]] = set()
         self._event_listeners: set[RefreshEventListener] = set()
         self.state = STATE_IDLE
+        self.refresh_progress: HacsRefreshProgress | None = None
         self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
@@ -106,6 +108,14 @@ class HacsRefreshRuntimeData:
     def refresh_in_progress(self) -> bool:
         """Return whether a refresh is currently in progress."""
         return self._refresh_lock.locked()
+
+    @callback
+    def _async_update_refresh_progress(
+        self,
+        progress: HacsRefreshProgress,
+    ) -> None:
+        """Update the current HACS Refresh progress."""
+        self.refresh_progress = progress
 
     async def async_initialize(self) -> None:
         """Restore persistent refresh state."""
@@ -230,13 +240,16 @@ class HacsRefreshRuntimeData:
             )
             return None
 
+        self.refresh_progress = None
         self.state = STATE_REFRESHING
         self.notify_listeners()
 
         start = perf_counter()
 
         try:
-            result = await self.hacs.async_refresh()
+            result = await self.hacs.async_refresh(
+                progress_callback=self._async_update_refresh_progress,
+            )
         except asyncio.CancelledError:
             self.state = STATE_IDLE
             raise

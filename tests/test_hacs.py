@@ -7,6 +7,7 @@ from custom_components.hacs_refresh.hacs import (
     HacsAdapter,
     HacsDisabledError,
     HacsQueueBusyError,
+    HacsRefreshProgress,
     HacsRefreshResult,
     HacsUnavailableError,
 )
@@ -77,8 +78,12 @@ async def test_refresh_succeeds(
     hacs.repositories.list_downloaded = [repository]
     hass.data["hacs"] = hacs
 
+    progress_updates: list[HacsRefreshProgress] = []
+
     adapter = HacsAdapter(hass)
-    result = await adapter.async_refresh()
+    result = await adapter.async_refresh(
+        progress_callback=progress_updates.append,
+    )
 
     assert result == HacsRefreshResult(
         repositories=1,
@@ -89,6 +94,22 @@ async def test_refresh_succeeds(
         pending_repositories=(),
         failures=(),
     )
+
+    assert progress_updates == [
+        HacsRefreshProgress(
+            total=1,
+            processed=0,
+            successful=0,
+            failed=0,
+        ),
+        HacsRefreshProgress(
+            total=1,
+            processed=1,
+            successful=1,
+            failed=0,
+        ),
+    ]
+    assert progress_updates[-1].remaining == 0
 
     repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
@@ -149,8 +170,12 @@ async def test_refresh_reports_pending_repositories(
 
     hacs.async_process_queue = AsyncMock(side_effect=process_queue)
 
+    progress_updates: list[HacsRefreshProgress] = []
+
     adapter = HacsAdapter(hass)
-    result = await adapter.async_refresh()
+    result = await adapter.async_refresh(
+        progress_callback=progress_updates.append,
+    )
 
     pending_task = hacs.queue.add.call_args_list[1].args[0]
 
@@ -164,8 +189,25 @@ async def test_refresh_reports_pending_repositories(
         failures=(),
     )
 
+    assert progress_updates == [
+        HacsRefreshProgress(
+            total=2,
+            processed=0,
+            successful=0,
+            failed=0,
+        ),
+        HacsRefreshProgress(
+            total=2,
+            processed=1,
+            successful=1,
+            failed=0,
+        ),
+    ]
+    assert progress_updates[-1].remaining == 1
+
     assert processed_repository.update_repository.await_count == 1
     pending_repository.update_repository.assert_not_awaited()
+
     pending_task.close()
     hacs.data.async_write.assert_awaited_once()
 
@@ -191,8 +233,12 @@ async def test_refresh_reports_repository_failure(
     ]
     hass.data["hacs"] = hacs
 
+    progress_updates: list[HacsRefreshProgress] = []
+
     adapter = HacsAdapter(hass)
-    result = await adapter.async_refresh()
+    result = await adapter.async_refresh(
+        progress_callback=progress_updates.append,
+    )
 
     assert result == HacsRefreshResult(
         repositories=2,
@@ -203,6 +249,26 @@ async def test_refresh_reports_repository_failure(
         pending_repositories=(),
         failures=("example/failed-repository: Something went wrong",),
     )
+
+    assert len(progress_updates) == 3
+    assert progress_updates[0] == HacsRefreshProgress(
+        total=2,
+        processed=0,
+        successful=0,
+        failed=0,
+    )
+    assert {
+        (
+            progress.processed,
+            progress.successful,
+            progress.failed,
+            progress.remaining,
+        )
+        for progress in progress_updates[1:]
+    } == {
+        (1, 1, 0, 1),
+        (2, 1, 1, 0),
+    }
 
     successful_repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
