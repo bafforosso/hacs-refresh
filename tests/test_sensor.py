@@ -7,6 +7,7 @@ from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    STATUS_SENSOR_UNIQUE_ID,
 )
 from custom_components.hacs_refresh.sensor import (
     HacsRefreshStatusSensor,
@@ -24,7 +25,7 @@ def test_status_sensor_initializes() -> None:
 
     assert sensor.runtime is runtime
     assert sensor.native_value == "idle"
-    assert sensor.unique_id == "hacs_refresh_status"
+    assert sensor.unique_id == STATUS_SENSOR_UNIQUE_ID
     assert sensor._attr_translation_key == "status"
     runtime.add_listener.assert_not_called()
 

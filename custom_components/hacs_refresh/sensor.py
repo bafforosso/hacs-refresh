@@ -16,6 +16,7 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    STATUS_SENSOR_UNIQUE_ID,
     WEEKDAYS,
 )
 from .entity import HacsRefreshEntity
@@ -44,7 +45,7 @@ class HacsRefreshStatusSensor(
     _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_unique_id = "hacs_refresh_status"
+    _attr_unique_id = STATUS_SENSOR_UNIQUE_ID
 
     async def async_added_to_hass(self) -> None:
         """Register the runtime listener."""

@@ -9,7 +9,9 @@ MIN_HA_VERSION = "2024.12.0"
 
 SERVICE_REFRESH = "refresh"
 
+BUTTON_ENTITY_UNIQUE_ID = "hacs_refresh_manual_refresh"
 EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"
+STATUS_SENSOR_UNIQUE_ID = "hacs_refresh_status"
 
 STORAGE_KEY = f"{DOMAIN}.last_refresh"
 STORAGE_VERSION_MAJOR = 1

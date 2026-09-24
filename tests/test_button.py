@@ -6,6 +6,7 @@ from custom_components.hacs_refresh.button import (
     HacsRefreshButton,
     async_setup_entry,
 )
+from custom_components.hacs_refresh.const import BUTTON_ENTITY_UNIQUE_ID
 
 
 def test_refresh_button_initializes() -> None:
@@ -16,7 +17,7 @@ def test_refresh_button_initializes() -> None:
     button = HacsRefreshButton(runtime)
 
     assert button.runtime is runtime
-    assert button.unique_id == "hacs_refresh_manual_refresh"
+    assert button.unique_id == BUTTON_ENTITY_UNIQUE_ID
     assert button._attr_translation_key == "refresh"
     runtime.add_listener.assert_not_called()
 
