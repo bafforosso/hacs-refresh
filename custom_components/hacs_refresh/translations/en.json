@@ -47,6 +47,9 @@
           "idle": "Idle",
           "refreshing": "Refreshing"
         }
+      },
+      "progress": {
+        "name": "Progress"
       }
     }
   },

@@ -105,8 +105,6 @@ Manual refreshes can be triggered regardless of whether automatic refreshes are 
 
 ## Status Sensor
 
-The integration creates:
-
 `sensor.hacs_refresh_status`
 
 Its `state` shows whether a refresh is currently running:
@@ -124,6 +122,32 @@ Its `attributes` provide details about the configured automatic refresh schedule
 | `schedule_days` | `list[str]` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
 | `schedule_times` | `list[str]` | `HH:MM` | Times configured for automatic refreshes. |
 | `next_refresh` | `str \| null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
+
+## Refresh Progress Sensor
+
+`sensor.hacs_refresh_progress`
+
+Its `state` shows the progress of the currently running refresh as a percentage.
+
+| State | Description |
+| --- | --- |
+| `unknown` | No refresh is currently running. |
+| `0`–`99 %` | A refresh is in progress. |
+| `100 %` | The refresh has completed processing all repositories. |
+
+When no repositories are installed, the sensor briefly reports `100 %` before returning to `unknown`.
+
+The progress sensor can be displayed as a horizontal progress bar using Home Assistant's native Tile card `bar-gauge` feature.
+
+### Tile card progress bar
+```yaml
+type: tile
+entity: sensor.hacs_refresh_progress
+features:
+  - type: bar-gauge
+    min: 0
+    max: 100
+```
 
 ## Refresh Completed Event
 

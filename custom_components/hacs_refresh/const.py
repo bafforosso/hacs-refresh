@@ -11,6 +11,7 @@ SERVICE_REFRESH = "refresh"
 
 BUTTON_ENTITY_UNIQUE_ID = "hacs_refresh_manual_refresh"
 EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"
+PROGRESS_SENSOR_UNIQUE_ID = "hacs_refresh_progress"
 STATUS_SENSOR_UNIQUE_ID = "hacs_refresh_status"
 
 STORAGE_KEY = f"{DOMAIN}.last_refresh"

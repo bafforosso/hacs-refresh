@@ -47,6 +47,9 @@
           "idle": "Inactif",
           "refreshing": "Actualisation en cours"
         }
+      },
+      "progress": {
+        "name": "Progression"
       }
     }
   },

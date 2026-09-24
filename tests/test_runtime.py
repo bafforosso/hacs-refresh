@@ -195,6 +195,38 @@ def test_runtime_listener_can_be_added_and_removed(
     listener.assert_called_once_with()
 
 
+def test_runtime_progress_listener_can_be_added_and_removed(
+    hass: HomeAssistant,
+) -> None:
+    """Test that progress listeners are notified and can be removed."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+    progress = HacsRefreshProgress(
+        total=2,
+        processed=1,
+        successful=1,
+        failed=0,
+    )
+
+    remove_listener = runtime.add_progress_listener(listener)
+
+    runtime._async_update_refresh_progress(progress)
+    listener.assert_called_once_with(progress)
+
+    remove_listener()
+
+    runtime._async_update_refresh_progress(
+        HacsRefreshProgress(
+            total=2,
+            processed=2,
+            successful=2,
+            failed=0,
+        )
+    )
+    listener.assert_called_once_with(progress)
+
+
 async def test_refresh_fails_when_hacs_is_unavailable(
     hass: HomeAssistant,
 ) -> None:
@@ -313,11 +345,13 @@ async def test_refresh_tracks_progress(
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     runtime_states: list[str] = []
+    progress_updates: list[HacsRefreshProgress | None] = []
 
     def runtime_listener() -> None:
         runtime_states.append(runtime.state)
 
     runtime.add_listener(runtime_listener)
+    runtime.add_progress_listener(progress_updates.append)
 
     async def async_refresh(
         *,
@@ -362,12 +396,29 @@ async def test_refresh_tracks_progress(
     assert outcome is not None
     assert outcome.repositories == 2
     assert outcome.successful == 2
-    assert runtime.refresh_progress == HacsRefreshProgress(
-        total=2,
-        processed=2,
-        successful=2,
-        failed=0,
-    )
+    assert runtime.refresh_progress is None
+
+    assert progress_updates == [
+        HacsRefreshProgress(
+            total=2,
+            processed=0,
+            successful=0,
+            failed=0,
+        ),
+        HacsRefreshProgress(
+            total=2,
+            processed=1,
+            successful=1,
+            failed=0,
+        ),
+        HacsRefreshProgress(
+            total=2,
+            processed=2,
+            successful=2,
+            failed=0,
+        ),
+        None,
+    ]
 
     # Progress updates must not notify the existing runtime listeners.
     assert runtime_states == [STATE_REFRESHING, STATE_IDLE]

@@ -11,6 +11,9 @@
       }
     },
     "sensor": {
+      "progress": {
+        "default": "mdi:progress-clock"
+      },
       "status": {
         "default": "mdi:refresh-circle"
       }

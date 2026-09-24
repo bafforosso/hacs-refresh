@@ -44,6 +44,11 @@ class HacsRefreshSkipped(HomeAssistantError):
 
 type RefreshEventListener = Callable[[str, dict[str, Any]], None]
 
+type RefreshProgressListener = Callable[
+    [HacsRefreshProgress | None],
+    None,
+]
+
 
 @dataclass(frozen=True, slots=True)
 class HacsRefreshOutcome:
@@ -85,6 +90,7 @@ class HacsRefreshRuntimeData:
         self._store = HacsRefreshStore(hass)
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()
+        self._progress_listeners: set[RefreshProgressListener] = set()
         self._event_listeners: set[RefreshEventListener] = set()
         self.state = STATE_IDLE
         self.refresh_progress: HacsRefreshProgress | None = None
@@ -116,6 +122,8 @@ class HacsRefreshRuntimeData:
     ) -> None:
         """Update the current HACS Refresh progress."""
         self.refresh_progress = progress
+        for listener in tuple(self._progress_listeners):
+            listener(progress)
 
     async def async_initialize(self) -> None:
         """Restore persistent refresh state."""
@@ -144,6 +152,18 @@ class HacsRefreshRuntimeData:
 
         def remove_listener() -> None:
             self._listeners.discard(listener)
+
+        return remove_listener
+
+    def add_progress_listener(
+        self,
+        listener: RefreshProgressListener,
+    ) -> Callable[[], None]:
+        """Register a listener for refresh progress changes."""
+        self._progress_listeners.add(listener)
+
+        def remove_listener() -> None:
+            self._progress_listeners.discard(listener)
 
         return remove_listener
 
@@ -218,6 +238,10 @@ class HacsRefreshRuntimeData:
                     raise
         finally:
             if lock_acquired:
+                if self.refresh_progress is not None:
+                    self.refresh_progress = None
+                    for listener in tuple(self._progress_listeners):
+                        listener(None)
                 self.notify_listeners()
 
     async def _async_refresh(
