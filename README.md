@@ -139,7 +139,7 @@ When no repositories are installed, the sensor briefly reports `100 %` before re
 
 The progress sensor can be displayed as a horizontal progress bar using Home Assistant's native Tile card `bar-gauge` feature.
 
-### Tile card progress bar
+### Tile card progress bar example
 ```yaml
 type: tile
 entity: sensor.hacs_refresh_progress

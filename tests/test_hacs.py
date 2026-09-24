@@ -13,6 +13,15 @@ from custom_components.hacs_refresh.hacs import (
 )
 
 
+def assert_progress_accounting(
+    progress_updates: list[HacsRefreshProgress],
+) -> None:
+    """Assert that progress accounting remains internally consistent."""
+    for progress in progress_updates:
+        assert progress.processed == progress.successful + progress.failed
+        assert progress.remaining == progress.total - progress.processed
+
+
 async def test_refresh_fails_when_hacs_is_unavailable(
     hass: HomeAssistant,
 ) -> None:
@@ -109,7 +118,7 @@ async def test_refresh_succeeds(
             failed=0,
         ),
     ]
-    assert progress_updates[-1].remaining == 0
+    assert_progress_accounting(progress_updates)
 
     repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
@@ -203,7 +212,7 @@ async def test_refresh_reports_pending_repositories(
             failed=0,
         ),
     ]
-    assert progress_updates[-1].remaining == 1
+    assert_progress_accounting(progress_updates)
 
     assert processed_repository.update_repository.await_count == 1
     pending_repository.update_repository.assert_not_awaited()
@@ -269,6 +278,7 @@ async def test_refresh_reports_repository_failure(
         (1, 1, 0, 1),
         (2, 1, 1, 0),
     }
+    assert_progress_accounting(progress_updates)
 
     successful_repository.update_repository.assert_awaited_once_with(
         ignore_issues=True,
