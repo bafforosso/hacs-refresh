@@ -12,6 +12,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-homeassistant-custom-component",
+    "pytest-timeout>=2.4.0",
     "ruff>=0.16.8",
 ]
 
@@ -31,6 +32,7 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+timeout = 60
 
 [tool.uv]
 package = false
