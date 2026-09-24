@@ -25,6 +25,7 @@ from custom_components.hacs_refresh.const import (
     CONF_TIMES,
     DOMAIN,
     MIN_HA_VERSION,
+    REFRESH_SOURCE_MANUAL,
     SERVICE_REFRESH,
 )
 from custom_components.hacs_refresh.hacs import HacsRefreshProgress
@@ -90,7 +91,7 @@ async def test_refresh_service_triggers_manual_refresh(
             blocking=True,
         )
 
-    mock_refresh.assert_awaited_once_with(source="manual")
+    mock_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_refresh_service_supports_optional_response(
@@ -151,7 +152,7 @@ async def test_refresh_service_returns_response_data(
         ],
         "duration": 2.5,
     }
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_refresh_service_does_not_return_response_data_by_default(
@@ -187,7 +188,7 @@ async def test_refresh_service_does_not_return_response_data_by_default(
         )
 
     assert response is None
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_setup_entry_rejects_unsupported_home_assistant_version(
