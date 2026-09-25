@@ -74,7 +74,7 @@ HACS Refresh lets you control when automatic refreshes run.
 
 Refresh times must use the `HH:MM` format and be separated by commas. For example: `03:00, 15:00`
 
-The automatic refresh setting can be configured during setup or through the integration's Options Flow. It can also be enabled or disabled at any time using the **Automatic refresh** switch.
+The automatic refresh settings can be configured during setup or later through the integration's configuration. It can also be enabled or disabled at any time using the **Automatic refresh** switch.
 
 <sub>*When automatic refresh is enabled, at least one day and one time must be configured. Up to 10 refresh times can be configured, and each refresh time must be at least 10 minutes apart.*</sub>
 
