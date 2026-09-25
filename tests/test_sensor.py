@@ -6,9 +6,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
-    CONF_AUTOMATIC_REFRESH,
-    CONF_DAYS,
-    CONF_TIMES,
     PROGRESS_SENSOR_UNIQUE_ID,
     STATUS_SENSOR_UNIQUE_ID,
 )
@@ -69,26 +66,14 @@ async def test_status_sensor_registers_runtime_listener() -> None:
     mock_async_on_remove.assert_called_once_with(remove_listener)
 
 
-def test_status_sensor_extra_state_attributes(freezer) -> None:
-    """Test that the status sensor exposes runtime information."""
-    freezer.move_to("2026-09-04 10:00:00+00:00")
-
+def test_status_sensor_has_no_extra_state_attributes() -> None:
+    """Test that the status sensor exposes no extra state attributes."""
     runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["mon", "wed", "fri"],
-        CONF_TIMES: ["02:30", "14:00"],
-    }
+    runtime.state = "idle"
 
     sensor = HacsRefreshStatusSensor(runtime)
-    attributes = sensor.extra_state_attributes
 
-    assert attributes == {
-        "automatic_refresh": True,
-        "schedule_days": ["mon", "wed", "fri"],
-        "schedule_times": ["02:30", "14:00"],
-        "next_refresh": "2026-09-04T14:00:00+00:00",
-    }
+    assert sensor.extra_state_attributes is None
 
 
 def test_status_sensor_runtime_update_writes_state() -> None:
@@ -103,48 +88,6 @@ def test_status_sensor_runtime_update_writes_state() -> None:
         sensor._async_runtime_updated()
 
     mock_write_state.assert_called_once_with()
-
-
-def test_status_sensor_next_refresh_disabled() -> None:
-    """Test that next_refresh is unavailable when automatic refresh is disabled."""
-    runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: ["mon", "wed", "fri"],
-        CONF_TIMES: ["02:30"],
-    }
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    assert sensor.extra_state_attributes["next_refresh"] is None
-
-
-def test_status_sensor_next_refresh_without_schedule() -> None:
-    """Test that next_refresh is unavailable without a schedule."""
-    runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: [],
-        CONF_TIMES: [],
-    }
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    assert sensor.extra_state_attributes["next_refresh"] is None
-
-
-def test_status_sensor_next_refresh_without_valid_schedule_day() -> None:
-    """Test that next_refresh is unavailable when no valid schedule day is configured."""
-    runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["invalid"],
-        CONF_TIMES: ["02:30"],
-    }
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    assert sensor.extra_state_attributes["next_refresh"] is None
 
 
 @pytest.mark.parametrize(

@@ -30,11 +30,14 @@ from custom_components.hacs_refresh.const import (
 )
 from custom_components.hacs_refresh.hacs import HacsRefreshProgress
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
+from custom_components.hacs_refresh.switch import (
+    HacsRefreshAutomaticRefreshSwitch,
+)
 
 
 def test_platforms() -> None:
     """Test the integration platforms."""
-    assert PLATFORMS == ["button", "event", "sensor"]
+    assert PLATFORMS == ["button", "event", "sensor", "switch"]
 
 
 async def test_service_is_registered(hass: HomeAssistant) -> None:
@@ -270,6 +273,7 @@ async def test_setup_entry_initializes_integration(
         hass,
         config_entry.runtime_data,
     )
+    assert config_entry.runtime_data.scheduler is scheduler
     scheduler.async_setup.assert_awaited_once()
     forward_entry_setups.assert_awaited_once_with(
         config_entry,
@@ -316,6 +320,63 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
         ) as mock_notify_listeners:
             await update_listener(hass, config_entry)
 
+        scheduler.async_setup.assert_awaited_once()
+        mock_notify_listeners.assert_called_once_with()
+
+
+async def test_switch_option_update_reconfigures_scheduler(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that changing the switch reconfigures the scheduler."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: False,
+            CONF_DAYS: ["mon", "wed", "fri"],
+            CONF_TIMES: ["03:00"],
+        },
+    )
+    config_entry.add_to_hass(hass)
+
+    hass.data["hacs"] = MagicMock()
+
+    forward_entry_setups = AsyncMock()
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        forward_entry_setups,
+    )
+
+    with (
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshRuntimeData.async_initialize",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshScheduler",
+        ) as scheduler_class,
+    ):
+        scheduler = scheduler_class.return_value
+        scheduler.async_setup = AsyncMock()
+
+        await async_setup_entry(hass, config_entry)
+
+        runtime = config_entry.runtime_data
+        switch = HacsRefreshAutomaticRefreshSwitch(runtime)
+        switch.hass = hass
+
+        scheduler.async_setup.reset_mock()
+
+        with patch.object(
+            runtime,
+            "notify_listeners",
+        ) as mock_notify_listeners:
+            await switch.async_turn_on()
+            await hass.async_block_till_done()
+
+        assert config_entry.options[CONF_AUTOMATIC_REFRESH] is True
+        assert switch.is_on is True
         scheduler.async_setup.assert_awaited_once()
         mock_notify_listeners.assert_called_once_with()
 

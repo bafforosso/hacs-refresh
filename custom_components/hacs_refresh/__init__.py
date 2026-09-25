@@ -29,7 +29,7 @@ from .const import (
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
-PLATFORMS = ["button", "event", "sensor"]
+PLATFORMS = ["button", "event", "sensor", "switch"]
 
 type HacsRefreshConfigEntry = ConfigEntry[HacsRefreshRuntimeData]
 
@@ -106,6 +106,7 @@ async def async_setup_entry(
         hass,
         runtime,
     )
+    runtime.scheduler = scheduler
 
     entry.async_on_unload(scheduler.async_unload)
 

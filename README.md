@@ -16,9 +16,10 @@ HACS normally checks for repository updates automatically, but detection of newl
 
 - **Automatic refresh** — configure refreshes for selected days and times or disable.
 - **Manual refresh** — trigger an immediate refresh from the **Refresh** button or action.
-- **Refresh protection** — prevent scheduled refreshes from running too frequently.
+- **Refresh progress** — monitor the progress of a currently running refresh.
 - **Refresh completed event** — report details of the last refresh and trigger automations when it completes.
-- **Status sensor** — monitor refresh state and schedule configuration.
+- **Status sensor** — monitor the current refresh state.
+- **Refresh protection** — prevent scheduled refreshes from running too frequently or overlapping.
 - **Diagnostics** — view configuration and runtime details for troubleshooting.
 
 ## Requirements
@@ -73,6 +74,8 @@ HACS Refresh lets you control when automatic refreshes run.
 
 Refresh times must use the `HH:MM` format and be separated by commas. For example: `03:00, 15:00`
 
+The automatic refresh settings can be configured during setup or later through the integration's configuration. It can also be enabled or disabled at any time using the **Automatic refresh** switch.
+
 <sub>*When automatic refresh is enabled, at least one day and one time must be configured. Up to 10 refresh times can be configured, and each refresh time must be at least 10 minutes apart.*</sub>
 
 ## Manual Refresh
@@ -103,6 +106,22 @@ Manual refreshes can be triggered regardless of whether automatic refreshes are 
 > [!WARNING]
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
 
+## Automatic Refresh Switch
+
+`switch.hacs_refresh_automatic_refresh`
+
+The **Automatic refresh** switch controls whether scheduled automatic refreshes are enabled.
+
+Its attributes provide the configured automatic refresh schedule and the next scheduled refresh:
+
+| Attribute | Type | Values / Format | Description |
+| --- | :---: | :---: | --- |
+| `schedule_days` | `list[str]` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
+| `schedule_times` | `list[str]` | `HH:MM` | Times configured for automatic refreshes. |
+| `next_refresh` | `str \| null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when automatic refresh is disabled or no next refresh is scheduled. |
+
+The configured schedule remains available when automatic refresh is disabled. `next_refresh` is `null` while automatic refresh is disabled.
+
 ## Status Sensor
 
 `sensor.hacs_refresh_status`
@@ -113,15 +132,6 @@ Its `state` shows whether a refresh is currently running:
 | --- | --- |
 | `idle` | No refresh is currently running. |
 | `refreshing` | A refresh is currently in progress. |
-
-Its `attributes` provide details about the configured automatic refresh schedule:
-
-| Attribute | Type | Values / Format | Description |
-| --- | :---: | :---: | --- |
-| `automatic_refresh` | `bool` | `true` / `false` | Whether automatic refresh is enabled. |
-| `schedule_days` | `list[str]` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
-| `schedule_times` | `list[str]` | `HH:MM` | Times configured for automatic refreshes. |
-| `next_refresh` | `str \| null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
 
 ## Refresh Progress Sensor
 

@@ -17,6 +17,11 @@
       "status": {
         "default": "mdi:refresh-circle"
       }
+    },
+    "switch": {
+      "automatic_refresh": {
+        "default": "mdi:refresh-auto"
+      }
     }
   }
 }
