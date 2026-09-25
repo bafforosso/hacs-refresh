@@ -9,6 +9,7 @@ MIN_HA_VERSION = "2024.12.0"
 
 SERVICE_REFRESH = "refresh"
 
+AUTOMATIC_REFRESH_SWITCH_UNIQUE_ID = "hacs_refresh_automatic_refresh"
 BUTTON_ENTITY_UNIQUE_ID = "hacs_refresh_manual_refresh"
 EVENT_ENTITY_UNIQUE_ID = "hacs_refresh_refresh_completed"
 PROGRESS_SENSOR_UNIQUE_ID = "hacs_refresh_progress"

@@ -34,7 +34,7 @@ from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 
 def test_platforms() -> None:
     """Test the integration platforms."""
-    assert PLATFORMS == ["button", "event", "sensor"]
+    assert PLATFORMS == ["button", "event", "sensor", "switch"]
 
 
 async def test_service_is_registered(hass: HomeAssistant) -> None:

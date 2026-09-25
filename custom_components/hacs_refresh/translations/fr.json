@@ -51,6 +51,11 @@
       "progress": {
         "name": "Progression"
       }
+    },
+    "switch": {
+      "automatic_refresh": {
+        "name": "Actualisation automatique"
+      }
     }
   },
   "exceptions": {
