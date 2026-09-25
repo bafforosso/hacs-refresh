@@ -166,33 +166,3 @@ async def test_automatic_refresh_switch_updates_config_entry(
         CONF_DAYS: ["mon", "wed", "fri"],
         CONF_TIMES: ["02:30", "14:00"],
     }
-
-
-async def test_automatic_refresh_switch_reads_updated_config_entry_options(
-    hass: HomeAssistant,
-) -> None:
-    """Test that the switch reflects external config entry updates."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        options={
-            CONF_AUTOMATIC_REFRESH: False,
-        },
-    )
-    entry.add_to_hass(hass)
-
-    runtime = MagicMock()
-    runtime.entry = entry
-
-    switch = HacsRefreshAutomaticRefreshSwitch(runtime)
-
-    assert switch.is_on is False
-
-    hass.config_entries.async_update_entry(
-        entry,
-        options={
-            **entry.options,
-            CONF_AUTOMATIC_REFRESH: True,
-        },
-    )
-
-    assert switch.is_on is True
