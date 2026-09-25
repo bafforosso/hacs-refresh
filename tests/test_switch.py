@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -38,6 +39,46 @@ def test_automatic_refresh_switch_initializes(
     assert switch.entity_category == EntityCategory.CONFIG
     assert switch.should_poll is False
     runtime.add_listener.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("automatic_refresh", "next_refresh", "expected_next_refresh"),
+    [
+        (
+            True,
+            datetime(2026, 9, 4, 14, 0, tzinfo=UTC),
+            "2026-09-04T14:00:00+00:00",
+        ),
+        (True, None, None),
+        (
+            False,
+            datetime(2026, 9, 4, 14, 0, tzinfo=UTC),
+            None,
+        ),
+    ],
+)
+def test_automatic_refresh_switch_exposes_schedule_and_next_refresh(
+    automatic_refresh: bool,
+    next_refresh: datetime | None,
+    expected_next_refresh: str | None,
+) -> None:
+    """Test that the switch exposes configured schedule and scheduler state."""
+    runtime = MagicMock()
+    runtime.entry.entry_id = "test-entry"
+    runtime.entry.options = {
+        CONF_AUTOMATIC_REFRESH: automatic_refresh,
+        CONF_DAYS: ["mon", "wed", "fri"],
+        CONF_TIMES: ["02:30", "14:00"],
+    }
+    runtime.scheduler.next_refresh = next_refresh
+
+    switch = HacsRefreshAutomaticRefreshSwitch(runtime)
+
+    assert switch.extra_state_attributes == {
+        "schedule_days": ["mon", "wed", "fri"],
+        "schedule_times": ["02:30", "14:00"],
+        "next_refresh": expected_next_refresh,
+    }
 
 
 async def test_switch_setup_entry(hass: HomeAssistant) -> None:

@@ -8,7 +8,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .scheduler import HacsRefreshScheduler
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -87,6 +90,7 @@ class HacsRefreshRuntimeData:
         self.hass = hass
         self.entry = entry
         self.hacs = HacsAdapter(hass)
+        self.scheduler: HacsRefreshScheduler | None = None
         self._store = HacsRefreshStore(hass)
         self._refresh_lock = asyncio.Lock()
         self._listeners: set[Callable[[], None]] = set()

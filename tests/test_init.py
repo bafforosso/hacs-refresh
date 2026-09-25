@@ -270,6 +270,7 @@ async def test_setup_entry_initializes_integration(
         hass,
         config_entry.runtime_data,
     )
+    assert config_entry.runtime_data.scheduler is scheduler
     scheduler.async_setup.assert_awaited_once()
     forward_entry_setups.assert_awaited_once_with(
         config_entry,

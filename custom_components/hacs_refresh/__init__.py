@@ -106,6 +106,7 @@ async def async_setup_entry(
         hass,
         runtime,
     )
+    runtime.scheduler = scheduler
 
     entry.async_on_unload(scheduler.async_unload)
 

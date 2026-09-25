@@ -11,6 +11,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     AUTOMATIC_REFRESH_SWITCH_UNIQUE_ID,
     CONF_AUTOMATIC_REFRESH,
+    CONF_DAYS,
+    CONF_TIMES,
 )
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
@@ -52,6 +54,37 @@ class HacsRefreshAutomaticRefreshSwitch(
             CONF_AUTOMATIC_REFRESH,
             False,
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Return automatic refresh configuration and schedule information."""
+        options = self.runtime.entry.options
+        scheduler = self.runtime.scheduler
+
+        automatic_refresh = options.get(
+            CONF_AUTOMATIC_REFRESH,
+            False,
+        )
+
+        next_refresh = (
+            scheduler.next_refresh
+            if automatic_refresh and scheduler is not None
+            else None
+        )
+
+        return {
+            "schedule_days": options.get(
+                CONF_DAYS,
+                [],
+            ),
+            "schedule_times": options.get(
+                CONF_TIMES,
+                [],
+            ),
+            "next_refresh": (
+                next_refresh.isoformat() if next_refresh is not None else None
+            ),
+        }
 
     async def async_turn_on(self, **kwargs: object) -> None:
         """Enable automatic refreshes."""
