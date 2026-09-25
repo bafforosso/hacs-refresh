@@ -79,12 +79,24 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 
 A manual refresh can be triggered using the **Refresh** button.
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the number of successfully refreshed repositories and the refresh duration when response data is requested.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the total repository count, successful, failed, and pending counts, the names of repositories that failed or were not processed, and the refresh duration.
 
 ```yaml
 action: hacs_refresh.refresh
 response_variable: refresh_result
 ```
+
+The response `data` contains:
+
+| Field | Type | Description |
+| --- | :---: | --- |
+| `repositories` | `int` | Total number of repositories included in the refresh. |
+| `successful` | `int` | Number of repositories refreshed successfully. |
+| `failed` | `int` | Number of repositories that failed to refresh. |
+| `pending` | `int` | Number of repositories that were not processed. |
+| `failed_repositories` | `list[str]` | Full names of repositories that failed to refresh. |
+| `pending_repositories` | `list[str]` | Full names of repositories that were not processed. |
+| `duration` | `float` | Refresh duration in seconds. |
 
 Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
@@ -92,8 +104,6 @@ Manual refreshes can be triggered regardless of whether automatic refreshes are 
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
 
 ## Status Sensor
-
-The integration creates:
 
 `sensor.hacs_refresh_status`
 
@@ -112,6 +122,32 @@ Its `attributes` provide details about the configured automatic refresh schedule
 | `schedule_days` | `list[str]` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` | Days configured for automatic refreshes. |
 | `schedule_times` | `list[str]` | `HH:MM` | Times configured for automatic refreshes. |
 | `next_refresh` | `str \| null` | ISO 8601 datetime | Date and time of the next scheduled automatic refresh, or `null` when no next refresh is scheduled. |
+
+## Refresh Progress Sensor
+
+`sensor.hacs_refresh_progress`
+
+Its `state` shows the progress of the currently running refresh as a percentage.
+
+| State | Description |
+| --- | --- |
+| `unknown` | No refresh is currently running. |
+| `0`–`99 %` | A refresh is in progress. |
+| `100 %` | The refresh has completed processing all repositories. |
+
+When no repositories are installed, the sensor briefly reports `100 %` before returning to `unknown`.
+
+The progress sensor can be displayed as a horizontal progress bar using Home Assistant's native Tile card `bar-gauge` feature.
+
+### Tile card progress bar example
+```yaml
+type: tile
+entity: sensor.hacs_refresh_progress
+features:
+  - type: bar-gauge
+    min: 0
+    max: 100
+```
 
 ## Refresh Completed Event
 
@@ -147,6 +183,8 @@ Its `attributes` provide further details about the refresh:
 | `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
 | `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
+| `failed_repositories` | `list[str]` | Always | Repository full names | Repositories that failed to refresh. |
+| `pending_repositories` | `list[str]` | Always | Repository full names | Repositories that were not processed. |
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.

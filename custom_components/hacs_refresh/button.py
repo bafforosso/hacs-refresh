@@ -7,7 +7,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import REFRESH_SOURCE_MANUAL
+from .const import (
+    BUTTON_ENTITY_UNIQUE_ID,
+    REFRESH_SOURCE_MANUAL,
+)
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
 
@@ -32,7 +35,7 @@ class HacsRefreshButton(
     """Represent the HACS Refresh manual refresh button."""
 
     _attr_translation_key = "refresh"
-    _attr_unique_id = "hacs_refresh_manual_refresh"
+    _attr_unique_id = BUTTON_ENTITY_UNIQUE_ID
 
     async def async_added_to_hass(self) -> None:
         """Register the runtime listener."""

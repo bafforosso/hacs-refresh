@@ -25,8 +25,10 @@ from custom_components.hacs_refresh.const import (
     CONF_TIMES,
     DOMAIN,
     MIN_HA_VERSION,
+    REFRESH_SOURCE_MANUAL,
     SERVICE_REFRESH,
 )
+from custom_components.hacs_refresh.hacs import HacsRefreshProgress
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 
 
@@ -89,7 +91,7 @@ async def test_refresh_service_triggers_manual_refresh(
             blocking=True,
         )
 
-    mock_refresh.assert_awaited_once_with(source="manual")
+    mock_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_refresh_service_supports_optional_response(
@@ -113,7 +115,12 @@ async def test_refresh_service_returns_response_data(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=7,
             successful=5,
+            failed=1,
+            pending=1,
+            failed_repositories=("example/failed-repository",),
+            pending_repositories=("example/pending-repository",),
             duration=2.5,
         )
     )
@@ -133,10 +140,19 @@ async def test_refresh_service_returns_response_data(
         )
 
     assert response == {
+        "repositories": 7,
         "successful": 5,
+        "failed": 1,
+        "pending": 1,
+        "failed_repositories": [
+            "example/failed-repository",
+        ],
+        "pending_repositories": [
+            "example/pending-repository",
+        ],
         "duration": 2.5,
     }
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_refresh_service_does_not_return_response_data_by_default(
@@ -148,7 +164,12 @@ async def test_refresh_service_does_not_return_response_data_by_default(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=5,
             successful=5,
+            failed=0,
+            pending=0,
+            failed_repositories=(),
+            pending_repositories=(),
             duration=2.5,
         )
     )
@@ -167,7 +188,7 @@ async def test_refresh_service_does_not_return_response_data_by_default(
         )
 
     assert response is None
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
 
 
 async def test_setup_entry_rejects_unsupported_home_assistant_version(
@@ -326,7 +347,10 @@ async def test_unload_entry_cancels_scheduled_refresh(
     refresh_cancelled = asyncio.Event()
     scheduled_callback: Callable[[datetime], Any] | None = None
 
-    async def async_refresh() -> None:
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+    ) -> None:
         """Keep the HACS refresh running until it is cancelled."""
         refresh_started.set()
 

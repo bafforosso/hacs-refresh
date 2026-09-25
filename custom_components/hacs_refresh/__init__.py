@@ -66,10 +66,7 @@ async def async_setup(
         if outcome is None:
             return None
 
-        return {
-            "successful": outcome.successful,
-            "duration": outcome.duration,
-        }
+        return outcome.as_dict()
 
     hass.services.async_register(
         DOMAIN,
