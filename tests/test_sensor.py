@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
@@ -29,6 +28,7 @@ def test_status_sensor_initializes() -> None:
     assert sensor.native_value == "idle"
     assert sensor.unique_id == STATUS_SENSOR_UNIQUE_ID
     assert sensor._attr_translation_key == "status"
+    assert sensor.entity_category is None
     runtime.add_listener.assert_not_called()
 
 
@@ -156,7 +156,7 @@ def test_progress_sensor_value(
     assert sensor.unique_id == PROGRESS_SENSOR_UNIQUE_ID
     assert sensor._attr_translation_key == "progress"
     assert sensor.native_unit_of_measurement == "%"
-    assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+    assert sensor.entity_category is None
     assert sensor.should_poll is False
 
 
