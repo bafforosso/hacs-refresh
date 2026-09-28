@@ -21,6 +21,7 @@ from custom_components.hacs_refresh.const import (
 )
 from custom_components.hacs_refresh.hacs import (
     HacsDisabledError,
+    HacsInvalidRepositoriesError,
     HacsQueueBusyError,
     HacsRefreshProgress,
     HacsRefreshResult,
@@ -277,12 +278,37 @@ async def test_refresh_fails_when_hacs_is_disabled(
     assert runtime.state == STATE_IDLE
 
 
+async def test_refresh_selected_repositories_handles_hacs_unavailable(
+    hass: HomeAssistant,
+) -> None:
+    """Test that HACS unavailability during validation is translated."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "validate_repositories",
+            side_effect=HacsUnavailableError,
+        ),
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
+        await runtime.async_refresh(
+            source=REFRESH_SOURCE_MANUAL,
+            repositories=("example/repository",),
+        )
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "hacs_unavailable"
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_progress is None
+
+
 async def test_refresh_succeeds(
     hass: HomeAssistant,
 ) -> None:
-    """Test a successful HACS refresh."""
+    """Test that a refresh succeeds and persists its result."""
     entry = MockConfigEntry(domain=DOMAIN)
-
     runtime = HacsRefreshRuntimeData(hass, entry)
 
     with (
@@ -302,7 +328,11 @@ async def test_refresh_succeeds(
     ):
         outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
 
-    mock_refresh.assert_awaited_once()
+    mock_refresh.assert_awaited_once_with(
+        progress_callback=runtime._async_update_refresh_progress,
+        repositories=None,
+    )
+
     assert outcome is not None
     assert outcome.repositories == 1
     assert outcome.successful == 1
@@ -337,6 +367,73 @@ async def test_refresh_succeeds(
     assert stored["pending"] == 0
 
 
+async def test_refresh_validates_repositories_before_starting(
+    hass: HomeAssistant,
+) -> None:
+    """Test that repositories are validated before refresh state starts."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "validate_repositories",
+            return_value=("example/valid-repository",),
+        ) as mock_validate,
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(),
+        ) as mock_refresh,
+    ):
+        await runtime.async_refresh(
+            source=REFRESH_SOURCE_MANUAL,
+            repositories=("example/valid-repository",),
+        )
+
+    mock_validate.assert_called_once_with(
+        ("example/valid-repository",),
+    )
+    mock_refresh.assert_awaited_once_with(
+        progress_callback=runtime._async_update_refresh_progress,
+        repositories=("example/valid-repository",),
+    )
+
+
+async def test_refresh_does_not_start_when_repository_validation_fails(
+    hass: HomeAssistant,
+) -> None:
+    """Test that refresh state is unchanged when repository validation fails."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "validate_repositories",
+            side_effect=HacsInvalidRepositoriesError(
+                ("example/unknown-repository",),
+            ),
+        ),
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        pytest.raises(HacsInvalidRepositoriesError),
+    ):
+        await runtime.async_refresh(
+            source=REFRESH_SOURCE_MANUAL,
+            repositories=("example/unknown-repository",),
+        )
+
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_in_progress is False
+    assert runtime.refresh_progress is None
+    mock_refresh.assert_not_awaited()
+
+
 async def test_refresh_tracks_progress(
     hass: HomeAssistant,
 ) -> None:
@@ -356,6 +453,7 @@ async def test_refresh_tracks_progress(
     async def async_refresh(
         *,
         progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
     ) -> HacsRefreshResult:
         progress_callback(
             HacsRefreshProgress(
@@ -483,6 +581,7 @@ async def test_refresh_handles_cancellation(
     async def async_refresh(
         *,
         progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
     ) -> HacsRefreshResult:
         refresh_started.set()
         await asyncio.Event().wait()
@@ -878,6 +977,7 @@ async def test_refresh_preserves_last_completed_state_while_running(
     async def async_refresh(
         *,
         progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
     ) -> HacsRefreshResult:
         refresh_started.set()
         await release_refresh.wait()
