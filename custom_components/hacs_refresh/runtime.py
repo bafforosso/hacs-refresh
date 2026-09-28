@@ -17,6 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
+from homeassistant.util.json import JsonObjectType
 
 from .const import (
     DOMAIN,
@@ -66,7 +67,7 @@ class HacsRefreshOutcome:
     pending_repositories: tuple[str, ...]
     duration: float
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> JsonObjectType:
         """Return the outcome as action response data."""
         return {
             "repositories": self.repositories,
