@@ -15,7 +15,7 @@ HACS normally checks for repository updates automatically, but detection of newl
 ## Features
 
 - **Automatic refresh** — configure refreshes for selected days and times or disable.
-- **Manual refresh** — trigger an immediate refresh from the **Refresh** button or action.
+- **Manual refresh** — trigger an immediate refresh from the **Refresh** button or action, optionally targeting only specific repositories.
 - **Refresh progress** — monitor the progress of a currently running refresh.
 - **Refresh completed event** — report details of the last refresh and trigger automations when it completes.
 - **Status sensor** — monitor the current refresh state.
@@ -66,7 +66,7 @@ Alternatively, you can add the repository manually:
 
 ## Configuration
 
-HACS Refresh lets you control when automatic refreshes run.
+HACS Refresh automatically refreshes all installed HACS repositories according to the configured schedule.
 
 - **Automatic refresh** — enable or disable scheduled automatic refreshes.
 - **Days of the week** — choose one or more days on which automatic refreshes should run.
@@ -80,12 +80,22 @@ The automatic refresh settings can be configured during setup or later through t
 
 ## Manual Refresh
 
-A manual refresh can be triggered using the **Refresh** button.
+Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. The action returns the total repository count, successful, failed, and pending counts, the names of repositories that failed or were not processed, and the refresh duration.
+### Refresh Button
+
+A manual refresh can be triggered using the **Refresh** button. It refreshes all installed HACS repositories.
+
+### Refresh Action
+
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. If `repositories` is omitted, all installed HACS repositories are refreshed. To refresh only specific repositories, provide their full HACS names in the `owner/repository` format.
 
 ```yaml
 action: hacs_refresh.refresh
+data:
+  repositories:
+    - user/repository
+    - another/repository
 response_variable: refresh_result
 ```
 
@@ -100,8 +110,6 @@ The response `data` contains:
 | `failed_repositories` | `list[str]` | Full names of repositories that failed to refresh. |
 | `pending_repositories` | `list[str]` | Full names of repositories that were not processed. |
 | `duration` | `float` | Refresh duration in seconds. |
-
-Manual refreshes can be triggered regardless of whether automatic refreshes are enabled.
 
 > [!WARNING]
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
@@ -143,7 +151,7 @@ Its `state` shows the progress of the currently running refresh as a percentage.
 | --- | --- |
 | `unknown` | No refresh is currently running. |
 | `0`–`99 %` | A refresh is in progress. |
-| `100 %` | The refresh has completed processing all repositories. |
+| `100 %` | The refresh has completed processing all repositories included in the refresh. |
 
 When no repositories are installed, the sensor briefly reports `100 %` before returning to `unknown`.
 
@@ -179,7 +187,7 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | The refresh completed successfully for all repositories. |
+| `success` | The refresh completed successfully for all repositories included in the refresh. |
 | `partial` | The refresh completed with one or more repositories still pending. |
 | `failed` | The refresh completed with one or more repositories failing to refresh. |
 

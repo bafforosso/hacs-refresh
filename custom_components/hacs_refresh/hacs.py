@@ -21,6 +21,15 @@ class HacsQueueBusyError(Exception):
     """Raised when the HACS queue is busy."""
 
 
+class HacsInvalidRepositoriesError(Exception):
+    """Raised when requested HACS repositories are invalid."""
+
+    def __init__(self, repositories: tuple[str, ...]) -> None:
+        """Initialize the exception."""
+        super().__init__()
+        self.repositories = repositories
+
+
 @dataclass(frozen=True, slots=True)
 class HacsRefreshResult:
     """Result of a HACS repository refresh."""
@@ -71,18 +80,66 @@ class HacsAdapter:
 
         return hacs
 
+    def validate_repositories(
+        self,
+        repositories: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """Validate and normalize requested repository names."""
+        hacs = self._get_hacs()
+        resolved = self._resolve_repositories(hacs, repositories)
+
+        return tuple(repository.data.full_name for repository in resolved)
+
+    def _resolve_repositories(
+        self,
+        hacs: Any,
+        repositories: tuple[str, ...] | None,
+    ) -> list[Any]:
+        """Resolve requested repository names to installed HACS repositories."""
+        if repositories is None:
+            return list(hacs.repositories.list_downloaded)
+
+        resolved: list[Any] = []
+        invalid_repositories: list[str] = []
+        seen: set[str] = set()
+
+        for repository_name in repositories:
+            normalized_name = repository_name.lower()
+
+            if normalized_name in seen:
+                continue
+
+            seen.add(normalized_name)
+
+            repository = hacs.repositories.get_by_full_name(repository_name)
+
+            if repository is None or not repository.data.installed:
+                invalid_repositories.append(repository_name)
+                continue
+
+            resolved.append(repository)
+
+        if invalid_repositories:
+            raise HacsInvalidRepositoriesError(tuple(invalid_repositories))
+
+        return resolved
+
     async def async_refresh(
         self,
         *,
         progress_callback: HacsRefreshProgressCallback | None = None,
+        repositories: tuple[str, ...] | None = None,
     ) -> HacsRefreshResult:
-        """Refresh all installed HACS repositories."""
+        """Refresh selected or all installed HACS repositories."""
         hacs = self._get_hacs()
 
         if hacs.queue.running or hacs.queue.has_pending_tasks:
             raise HacsQueueBusyError
 
-        repositories = list(hacs.repositories.list_downloaded)
+        repositories_to_refresh = self._resolve_repositories(
+            hacs,
+            repositories,
+        )
 
         processed = 0
         successful = 0
@@ -93,7 +150,7 @@ class HacsAdapter:
             if progress_callback is not None:
                 progress_callback(
                     HacsRefreshProgress(
-                        total=len(repositories),
+                        total=len(repositories_to_refresh),
                         processed=processed,
                         successful=successful,
                         failed=failed,
@@ -102,7 +159,7 @@ class HacsAdapter:
 
         report_progress()
 
-        if not repositories:
+        if not repositories_to_refresh:
             return HacsRefreshResult(
                 repositories=0,
                 successful=0,
@@ -143,7 +200,7 @@ class HacsAdapter:
                 processed += 1
                 report_progress()
 
-        for index, repository in enumerate(repositories):
+        for index, repository in enumerate(repositories_to_refresh):
             repository_name = getattr(
                 repository.data,
                 "full_name",

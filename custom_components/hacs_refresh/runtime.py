@@ -31,6 +31,7 @@ from .const import (
 from .hacs import (
     HacsAdapter,
     HacsDisabledError,
+    HacsInvalidRepositoriesError,
     HacsQueueBusyError,
     HacsRefreshProgress,
     HacsRefreshResult,
@@ -210,8 +211,9 @@ class HacsRefreshRuntimeData:
         self,
         *,
         source: str,
+        repositories: tuple[str, ...] | None = None,
     ) -> HacsRefreshOutcome | None:
-        """Force-refresh all installed HACS repositories."""
+        """Force-refresh selected or all installed HACS repositories."""
         if self.refresh_in_progress:
             if source == REFRESH_SOURCE_SCHEDULED:
                 _LOGGER.warning(
@@ -230,7 +232,10 @@ class HacsRefreshRuntimeData:
             async with self._refresh_lock:
                 lock_acquired = True
                 try:
-                    return await self._async_refresh(source=source)
+                    return await self._async_refresh(
+                        source=source,
+                        repositories=repositories,
+                    )
                 except HacsRefreshSkipped:
                     if source == REFRESH_SOURCE_SCHEDULED:
                         return None
@@ -252,6 +257,7 @@ class HacsRefreshRuntimeData:
         self,
         *,
         source: str,
+        repositories: tuple[str, ...] | None = None,
     ) -> HacsRefreshOutcome | None:
         """Run a HACS refresh and update runtime state."""
         now = dt_util.now()
@@ -268,17 +274,24 @@ class HacsRefreshRuntimeData:
             )
             return None
 
-        self.refresh_progress = None
-        self.state = STATE_REFRESHING
-        self.notify_listeners()
-
-        start = perf_counter()
-
         try:
+            if repositories is not None:
+                repositories = self.hacs.validate_repositories(repositories)
+
+            self.refresh_progress = None
+            self.state = STATE_REFRESHING
+            self.notify_listeners()
+
+            start = perf_counter()
+
             result = await self.hacs.async_refresh(
                 progress_callback=self._async_update_refresh_progress,
+                repositories=repositories,
             )
         except asyncio.CancelledError:
+            self.state = STATE_IDLE
+            raise
+        except HacsInvalidRepositoriesError:
             self.state = STATE_IDLE
             raise
         except HacsUnavailableError as err:

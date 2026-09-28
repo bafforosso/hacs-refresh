@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.hacs_refresh.hacs import (
     HacsAdapter,
     HacsDisabledError,
+    HacsInvalidRepositoriesError,
     HacsQueueBusyError,
     HacsRefreshProgress,
     HacsRefreshResult,
@@ -73,6 +74,72 @@ async def test_refresh_fails_when_queue_is_busy(
         await adapter.async_refresh()
 
     hacs.async_process_queue.assert_not_awaited()
+
+
+def test_validate_repositories_returns_normalized_names(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that repository validation normalizes and deduplicates names."""
+    first_repository = MagicMock()
+    first_repository.data.full_name = "example/first-repository"
+    first_repository.data.installed = True
+
+    second_repository = MagicMock()
+    second_repository.data.full_name = "example/second-repository"
+    second_repository.data.installed = True
+
+    hacs.repositories.get_by_full_name.side_effect = lambda name: {
+        "example/first-repository": first_repository,
+        "example/second-repository": second_repository,
+    }.get(name.lower())
+    hass.data["hacs"] = hacs
+
+    adapter = HacsAdapter(hass)
+
+    result = adapter.validate_repositories(
+        (
+            "EXAMPLE/FIRST-REPOSITORY",
+            "example/first-repository",
+            "example/second-repository",
+        )
+    )
+
+    assert result == (
+        "example/first-repository",
+        "example/second-repository",
+    )
+
+
+def test_validate_repositories_reports_all_invalid_repositories(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that repository validation reports all invalid names."""
+    installed_repository = MagicMock()
+    installed_repository.data.full_name = "example/installed"
+    installed_repository.data.installed = True
+
+    hacs.repositories.get_by_full_name.side_effect = lambda name: (
+        installed_repository if name.lower() == "example/installed" else None
+    )
+    hass.data["hacs"] = hacs
+
+    adapter = HacsAdapter(hass)
+
+    with pytest.raises(HacsInvalidRepositoriesError) as err:
+        adapter.validate_repositories(
+            (
+                "example/installed",
+                "example/unknown-one",
+                "example/unknown-two",
+            )
+        )
+
+    assert err.value.repositories == (
+        "example/unknown-one",
+        "example/unknown-two",
+    )
 
 
 async def test_refresh_succeeds(
@@ -314,3 +381,132 @@ async def test_refresh_updates_hacs_coordinators(
     await adapter.async_refresh()
 
     coordinator.async_update_listeners.assert_called_once()
+
+
+async def test_refreshes_selected_repositories_only(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that only selected repositories are refreshed."""
+    first_repository = MagicMock()
+    first_repository.data.full_name = "example/first-repository"
+    first_repository.data.installed = True
+    first_repository.update_repository = AsyncMock()
+
+    second_repository = MagicMock()
+    second_repository.data.full_name = "example/second-repository"
+    second_repository.data.installed = True
+    second_repository.update_repository = AsyncMock()
+
+    third_repository = MagicMock()
+    third_repository.data.full_name = "example/third-repository"
+    third_repository.data.installed = True
+    third_repository.update_repository = AsyncMock()
+
+    hacs.repositories.list_downloaded = [
+        first_repository,
+        second_repository,
+        third_repository,
+    ]
+    hacs.repositories.get_by_full_name.side_effect = lambda name: {
+        "example/first-repository": first_repository,
+        "example/second-repository": second_repository,
+        "example/third-repository": third_repository,
+    }.get(name.lower())
+    hass.data["hacs"] = hacs
+
+    adapter = HacsAdapter(hass)
+
+    result = await adapter.async_refresh(
+        repositories=(
+            "EXAMPLE/FIRST-REPOSITORY",
+            "example/first-repository",
+            "example/third-repository",
+        )
+    )
+
+    assert result.repositories == 2
+    assert result.successful == 2
+    assert result.failed == 0
+    assert result.pending == 0
+    assert result.failed_repositories == ()
+    assert result.pending_repositories == ()
+
+    first_repository.update_repository.assert_awaited_once_with(
+        ignore_issues=True,
+        force=True,
+    )
+    second_repository.update_repository.assert_not_awaited()
+    third_repository.update_repository.assert_awaited_once_with(
+        ignore_issues=True,
+        force=True,
+    )
+
+
+def test_validate_repositories_rejects_non_installed_repository(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that a known but non-installed repository is rejected."""
+    repository = MagicMock()
+    repository.data.full_name = "example/not-installed"
+    repository.data.installed = False
+
+    hacs.repositories.get_by_full_name.return_value = repository
+    hass.data["hacs"] = hacs
+
+    adapter = HacsAdapter(hass)
+
+    with pytest.raises(HacsInvalidRepositoriesError) as err:
+        adapter.validate_repositories(
+            ("example/not-installed",),
+        )
+
+    assert err.value.repositories == ("example/not-installed",)
+
+
+async def test_refresh_reports_selected_repository_count_in_progress(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that targeted refresh progress uses the selected count."""
+    first_repository = MagicMock()
+    first_repository.data.full_name = "example/first-repository"
+    first_repository.data.installed = True
+    first_repository.update_repository = AsyncMock()
+
+    second_repository = MagicMock()
+    second_repository.data.full_name = "example/second-repository"
+    second_repository.data.installed = True
+    second_repository.update_repository = AsyncMock()
+
+    hacs.repositories.get_by_full_name.side_effect = lambda name: {
+        "example/first-repository": first_repository,
+        "example/second-repository": second_repository,
+    }.get(name.lower())
+    hass.data["hacs"] = hacs
+
+    progress_updates: list[HacsRefreshProgress] = []
+
+    adapter = HacsAdapter(hass)
+
+    await adapter.async_refresh(
+        repositories=(
+            "example/first-repository",
+            "example/second-repository",
+        ),
+        progress_callback=progress_updates.append,
+    )
+
+    assert progress_updates[0] == HacsRefreshProgress(
+        total=2,
+        processed=0,
+        successful=0,
+        failed=0,
+    )
+    assert progress_updates[-1] == HacsRefreshProgress(
+        total=2,
+        processed=2,
+        successful=2,
+        failed=0,
+    )

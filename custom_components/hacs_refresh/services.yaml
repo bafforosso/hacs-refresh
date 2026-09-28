@@ -1,1 +1,10 @@
 refresh:
+  fields:
+    repositories:
+      required: false
+      example:
+        - user/repository
+        - another/repository
+      selector:
+        text:
+          multiple: true

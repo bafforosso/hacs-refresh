@@ -11,6 +11,7 @@ from custom_components.hacs_refresh.const import (
     CONF_DAYS,
     CONF_TIMES,
     DOMAIN,
+    REFRESH_SOURCE_SCHEDULED,
 )
 from custom_components.hacs_refresh.runtime import HacsRefreshRuntimeData
 from custom_components.hacs_refresh.scheduler import HacsRefreshScheduler
@@ -223,7 +224,7 @@ async def test_scheduler_triggers_refresh_on_configured_day(
         refresh_coroutine = create_task_mock.call_args.args[1]
         await refresh_coroutine
 
-    mock_refresh.assert_awaited_once_with(source="scheduled")
+    mock_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_SCHEDULED)
 
 
 async def test_scheduler_skips_non_configured_day(
