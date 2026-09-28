@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -41,7 +40,6 @@ class HacsRefreshStatusSensor(
     """Represent HACS Refresh status."""
 
     _attr_translation_key = "status"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
     _attr_unique_id = STATUS_SENSOR_UNIQUE_ID
 
@@ -68,7 +66,6 @@ class HacsRefreshProgressSensor(
     """Represent HACS Refresh progress."""
 
     _attr_translation_key = "progress"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = "%"
     _attr_should_poll = False
     _attr_unique_id = PROGRESS_SENSOR_UNIQUE_ID
