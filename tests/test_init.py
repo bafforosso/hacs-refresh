@@ -25,14 +25,22 @@ from custom_components.hacs_refresh.const import (
     CONF_TIMES,
     DOMAIN,
     MIN_HA_VERSION,
+    REFRESH_SOURCE_MANUAL,
     SERVICE_REFRESH,
 )
+from custom_components.hacs_refresh.hacs import (
+    HacsInvalidRepositoriesError,
+    HacsRefreshProgress,
+)
 from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
+from custom_components.hacs_refresh.switch import (
+    HacsRefreshAutomaticRefreshSwitch,
+)
 
 
 def test_platforms() -> None:
     """Test the integration platforms."""
-    assert PLATFORMS == ["button", "event", "sensor"]
+    assert PLATFORMS == ["button", "event", "sensor", "switch"]
 
 
 async def test_service_is_registered(hass: HomeAssistant) -> None:
@@ -89,7 +97,10 @@ async def test_refresh_service_triggers_manual_refresh(
             blocking=True,
         )
 
-    mock_refresh.assert_awaited_once_with(source="manual")
+    mock_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=None,
+    )
 
 
 async def test_refresh_service_supports_optional_response(
@@ -113,7 +124,12 @@ async def test_refresh_service_returns_response_data(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=7,
             successful=5,
+            failed=1,
+            pending=1,
+            failed_repositories=("example/failed-repository",),
+            pending_repositories=("example/pending-repository",),
             duration=2.5,
         )
     )
@@ -133,10 +149,22 @@ async def test_refresh_service_returns_response_data(
         )
 
     assert response == {
+        "repositories": 7,
         "successful": 5,
+        "failed": 1,
+        "pending": 1,
+        "failed_repositories": [
+            "example/failed-repository",
+        ],
+        "pending_repositories": [
+            "example/pending-repository",
+        ],
         "duration": 2.5,
     }
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=None,
+    )
 
 
 async def test_refresh_service_does_not_return_response_data_by_default(
@@ -148,7 +176,12 @@ async def test_refresh_service_does_not_return_response_data_by_default(
     runtime = MagicMock()
     runtime.async_refresh = AsyncMock(
         return_value=HacsRefreshOutcome(
+            repositories=5,
             successful=5,
+            failed=0,
+            pending=0,
+            failed_repositories=(),
+            pending_repositories=(),
             duration=2.5,
         )
     )
@@ -167,7 +200,150 @@ async def test_refresh_service_does_not_return_response_data_by_default(
         )
 
     assert response is None
-    runtime.async_refresh.assert_awaited_once_with(source="manual")
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=None,
+    )
+
+
+async def test_refresh_service_rejects_empty_repository_list(
+    hass: HomeAssistant,
+) -> None:
+    """Test that an explicitly empty repository list is rejected."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock()
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_loaded_entries",
+            return_value=[entry],
+        ),
+        pytest.raises(ServiceValidationError) as err,
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": []},
+            blocking=True,
+        )
+
+    assert err.value.translation_key == "repositories_empty"
+    runtime.async_refresh.assert_not_awaited()
+
+
+async def test_refresh_service_passes_selected_repositories(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the refresh service passes selected repositories to runtime."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        return_value=HacsRefreshOutcome(
+            repositories=2,
+            successful=2,
+            failed=0,
+            pending=0,
+            failed_repositories=(),
+            pending_repositories=(),
+            duration=2.5,
+        )
+    )
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    repositories = [
+        "EXAMPLE/FIRST-REPOSITORY",
+        "example/second-repository",
+    ]
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[entry],
+    ):
+        response = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": repositories},
+            blocking=True,
+            return_response=True,
+        )
+
+    assert response == {
+        "repositories": 2,
+        "successful": 2,
+        "failed": 0,
+        "pending": 0,
+        "failed_repositories": [],
+        "pending_repositories": [],
+        "duration": 2.5,
+    }
+
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=tuple(repositories),
+    )
+
+
+async def test_refresh_service_translates_invalid_repositories(
+    hass: HomeAssistant,
+) -> None:
+    """Test that invalid repositories are translated for the service caller."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(
+        side_effect=HacsInvalidRepositoriesError(
+            (
+                "example/unknown-one",
+                "example/unknown-two",
+            )
+        )
+    )
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_loaded_entries",
+            return_value=[entry],
+        ),
+        pytest.raises(ServiceValidationError) as err,
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {
+                "repositories": [
+                    "example/unknown-one",
+                    "example/unknown-two",
+                ]
+            },
+            blocking=True,
+        )
+
+    assert err.value.translation_key == "repositories_invalid"
+    assert err.value.translation_placeholders == {
+        "repositories": ("example/unknown-one, example/unknown-two")
+    }
+
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=(
+            "example/unknown-one",
+            "example/unknown-two",
+        ),
+    )
 
 
 async def test_setup_entry_rejects_unsupported_home_assistant_version(
@@ -249,6 +425,7 @@ async def test_setup_entry_initializes_integration(
         hass,
         config_entry.runtime_data,
     )
+    assert config_entry.runtime_data.scheduler is scheduler
     scheduler.async_setup.assert_awaited_once()
     forward_entry_setups.assert_awaited_once_with(
         config_entry,
@@ -299,6 +476,63 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
         mock_notify_listeners.assert_called_once_with()
 
 
+async def test_switch_option_update_reconfigures_scheduler(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that changing the switch reconfigures the scheduler."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: False,
+            CONF_DAYS: ["mon", "wed", "fri"],
+            CONF_TIMES: ["03:00"],
+        },
+    )
+    config_entry.add_to_hass(hass)
+
+    hass.data["hacs"] = MagicMock()
+
+    forward_entry_setups = AsyncMock()
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        forward_entry_setups,
+    )
+
+    with (
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshRuntimeData.async_initialize",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshScheduler",
+        ) as scheduler_class,
+    ):
+        scheduler = scheduler_class.return_value
+        scheduler.async_setup = AsyncMock()
+
+        await async_setup_entry(hass, config_entry)
+
+        runtime = config_entry.runtime_data
+        switch = HacsRefreshAutomaticRefreshSwitch(runtime)
+        switch.hass = hass
+
+        scheduler.async_setup.reset_mock()
+
+        with patch.object(
+            runtime,
+            "notify_listeners",
+        ) as mock_notify_listeners:
+            await switch.async_turn_on()
+            await hass.async_block_till_done()
+
+        assert config_entry.options[CONF_AUTOMATIC_REFRESH] is True
+        assert switch.is_on is True
+        scheduler.async_setup.assert_awaited_once()
+        mock_notify_listeners.assert_called_once_with()
+
+
 async def test_unload_entry_cancels_scheduled_refresh(
     hass: HomeAssistant,
     enable_custom_integrations: None,
@@ -326,7 +560,11 @@ async def test_unload_entry_cancels_scheduled_refresh(
     refresh_cancelled = asyncio.Event()
     scheduled_callback: Callable[[datetime], Any] | None = None
 
-    async def async_refresh() -> None:
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
+    ) -> None:
         """Keep the HACS refresh running until it is cancelled."""
         refresh_started.set()
 

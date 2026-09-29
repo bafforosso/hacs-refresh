@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configuration",
-        "description": "HACS Refresh vous permet de planifier ou de déclencher manuellement l’actualisation de tous les dépôts HACS installés.",
+        "description": "HACS Refresh vous permet de planifier ou de déclencher manuellement l’actualisation de tous ou d’une sélection des dépôts HACS installés.",
         "data": {
           "automatic_refresh": "Activer l’actualisation automatique",
           "days": "Jours de la semaine",
@@ -47,6 +47,14 @@
           "idle": "Inactif",
           "refreshing": "Actualisation en cours"
         }
+      },
+      "progress": {
+        "name": "Progression"
+      }
+    },
+    "switch": {
+      "automatic_refresh": {
+        "name": "Actualisation automatique"
       }
     }
   },
@@ -71,6 +79,12 @@
     },
     "refresh_tasks_pending": {
       "message": "Il reste {pending} tâche(s) d’actualisation d’HACS en attente."
+    },
+    "repositories_empty": {
+      "message": "Au moins un dépôt doit être spécifié lorsque le champ `repositories` est utilisé."
+    },
+    "repositories_invalid": {
+      "message": "Les dépôts suivants sont inconnus d’HACS ou ne sont pas installés : {repositories}"
     },
     "service_not_loaded": {
       "message": "HACS Refresh n’est pas configuré ou chargé."
@@ -120,7 +134,13 @@
   "services": {
     "refresh": {
       "name": "Actualiser les dépôts HACS",
-      "description": "Force l’actualisation de tous les dépôts HACS installés."
+      "description": "Actualise les métadonnées des dépôts HACS installés. Si des dépôts sont spécifiés, seuls ceux-ci sont actualisés.",
+      "fields": {
+        "repositories": {
+          "name": "Dépôts",
+          "description": "Liste facultative des dépôts HACS installés à actualiser. Utilisez leur nom complet au format `owner/repository`."
+        }
+      }
     }
   }
 }

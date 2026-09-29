@@ -3,9 +3,11 @@ from unittest.mock import MagicMock, patch
 from homeassistant.core import HomeAssistant
 
 from custom_components.hacs_refresh.const import (
+    EVENT_ENTITY_UNIQUE_ID,
     EVENT_TYPE_FAILED,
     EVENT_TYPE_PARTIAL,
     EVENT_TYPE_SUCCESS,
+    REFRESH_SOURCE_SCHEDULED,
 )
 from custom_components.hacs_refresh.event import (
     HacsRefreshCompletedEvent,
@@ -20,7 +22,7 @@ def test_refresh_completed_event_initializes() -> None:
     event = HacsRefreshCompletedEvent(runtime)
 
     assert event.runtime is runtime
-    assert event.unique_id == "hacs_refresh_refresh_completed"
+    assert event.unique_id == EVENT_ENTITY_UNIQUE_ID
     assert event._attr_translation_key == "refresh_completed"
     assert event._attr_should_poll is False
     assert event._attr_event_types == [
@@ -58,7 +60,7 @@ def test_refresh_completed_event_triggers_event() -> None:
         patch.object(event, "async_write_ha_state") as mock_write_state,
     ):
         event_data = {
-            "source": "scheduled",
+            "source": REFRESH_SOURCE_SCHEDULED,
             "duration": 2.5,
             "repositories": 5,
             "successful": 5,

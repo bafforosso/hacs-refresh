@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import voluptuous as vol
 from awesomeversion import AwesomeVersion
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import __version__ as HAVERSION
@@ -26,14 +27,21 @@ from .const import (
     REFRESH_SOURCE_MANUAL,
     SERVICE_REFRESH,
 )
+from .hacs import HacsInvalidRepositoriesError
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
-PLATFORMS = ["button", "event", "sensor"]
+PLATFORMS = ["button", "event", "sensor", "switch"]
 
 type HacsRefreshConfigEntry = ConfigEntry[HacsRefreshRuntimeData]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+SERVICE_REFRESH_SCHEMA = vol.Schema(
+    {
+        vol.Optional("repositories"): [cv.string],
+    }
+)
 
 
 async def async_setup(
@@ -45,7 +53,7 @@ async def async_setup(
     async def async_refresh(
         call: ServiceCall,
     ) -> ServiceResponse:
-        """Force-refresh all installed HACS repositories."""
+        """Force-refresh selected or all installed HACS repositories."""
         entries = hass.config_entries.async_loaded_entries(DOMAIN)
 
         if not entries:
@@ -54,11 +62,33 @@ async def async_setup(
                 translation_key="service_not_loaded",
             )
 
+        repositories = call.data.get("repositories")
+
+        if repositories is not None and not repositories:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="repositories_empty",
+            )
+
         entry = entries[0]
 
         runtime: HacsRefreshRuntimeData = entry.runtime_data
 
-        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        try:
+            outcome = await runtime.async_refresh(
+                source=REFRESH_SOURCE_MANUAL,
+                repositories=(
+                    tuple(repositories) if repositories is not None else None
+                ),
+            )
+        except HacsInvalidRepositoriesError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="repositories_invalid",
+                translation_placeholders={
+                    "repositories": ", ".join(err.repositories),
+                },
+            ) from err
 
         if not call.return_response:
             return None
@@ -66,15 +96,13 @@ async def async_setup(
         if outcome is None:
             return None
 
-        return {
-            "successful": outcome.successful,
-            "duration": outcome.duration,
-        }
+        return outcome.as_dict()
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_REFRESH,
         async_refresh,
+        schema=SERVICE_REFRESH_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
 
@@ -109,6 +137,7 @@ async def async_setup_entry(
         hass,
         runtime,
     )
+    runtime.scheduler = scheduler
 
     entry.async_on_unload(scheduler.async_unload)
 

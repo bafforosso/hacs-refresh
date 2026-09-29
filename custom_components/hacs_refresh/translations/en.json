@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configuration",
-        "description": "HACS Refresh allows you to schedule or manually trigger refreshes of all installed HACS repositories.",
+        "description": "HACS Refresh allows you to schedule or manually trigger refreshes of all or selected installed HACS repositories.",
         "data": {
           "automatic_refresh": "Enable automatic refresh",
           "days": "Days of the week",
@@ -47,6 +47,14 @@
           "idle": "Idle",
           "refreshing": "Refreshing"
         }
+      },
+      "progress": {
+        "name": "Progress"
+      }
+    },
+    "switch": {
+      "automatic_refresh": {
+        "name": "Automatic refresh"
       }
     }
   },
@@ -71,6 +79,12 @@
     },
     "refresh_tasks_pending": {
       "message": "{pending} HACS refresh task(s) remain pending."
+    },
+    "repositories_empty": {
+      "message": "At least one repository must be specified when using the `repositories` field."
+    },
+    "repositories_invalid": {
+      "message": "The following repositories are unknown or not installed in HACS: {repositories}"
     },
     "service_not_loaded": {
       "message": "HACS Refresh is not configured or loaded."
@@ -120,7 +134,13 @@
   "services": {
     "refresh": {
       "name": "Refresh HACS repositories",
-      "description": "Force-refresh all installed HACS repositories."
+      "description": "Refresh installed HACS repository metadata. If repositories are provided, only those repositories are refreshed.",
+      "fields": {
+        "repositories": {
+          "name": "Repositories",
+          "description": "Optional list of installed HACS repositories to refresh. Use full names in the format `owner/repository`."
+        }
+      }
     }
   }
 }

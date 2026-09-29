@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +21,15 @@ class HacsQueueBusyError(Exception):
     """Raised when the HACS queue is busy."""
 
 
+class HacsInvalidRepositoriesError(Exception):
+    """Raised when requested HACS repositories are invalid."""
+
+    def __init__(self, repositories: tuple[str, ...]) -> None:
+        """Initialize the exception."""
+        super().__init__()
+        self.repositories = repositories
+
+
 @dataclass(frozen=True, slots=True)
 class HacsRefreshResult:
     """Result of a HACS repository refresh."""
@@ -28,7 +38,27 @@ class HacsRefreshResult:
     successful: int
     failed: int
     pending: int
+    failed_repositories: tuple[str, ...]
+    pending_repositories: tuple[str, ...]
     failures: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class HacsRefreshProgress:
+    """Progress of a HACS repository refresh."""
+
+    total: int
+    processed: int
+    successful: int
+    failed: int
+
+    @property
+    def remaining(self) -> int:
+        """Return the number of repositories that remain unprocessed."""
+        return self.total - self.processed
+
+
+type HacsRefreshProgressCallback = Callable[[HacsRefreshProgress], None]
 
 
 class HacsAdapter:
@@ -50,32 +80,107 @@ class HacsAdapter:
 
         return hacs
 
-    async def async_refresh(self) -> HacsRefreshResult:
-        """Refresh all installed HACS repositories."""
+    def validate_repositories(
+        self,
+        repositories: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """Validate and normalize requested repository names."""
+        hacs = self._get_hacs()
+        resolved = self._resolve_repositories(hacs, repositories)
+
+        return tuple(repository.data.full_name for repository in resolved)
+
+    def _resolve_repositories(
+        self,
+        hacs: Any,
+        repositories: tuple[str, ...] | None,
+    ) -> list[Any]:
+        """Resolve requested repository names to installed HACS repositories."""
+        if repositories is None:
+            return list(hacs.repositories.list_downloaded)
+
+        resolved: list[Any] = []
+        invalid_repositories: list[str] = []
+        seen: set[str] = set()
+
+        for repository_name in repositories:
+            normalized_name = repository_name.lower()
+
+            if normalized_name in seen:
+                continue
+
+            seen.add(normalized_name)
+
+            repository = hacs.repositories.get_by_full_name(repository_name)
+
+            if repository is None or not repository.data.installed:
+                invalid_repositories.append(repository_name)
+                continue
+
+            resolved.append(repository)
+
+        if invalid_repositories:
+            raise HacsInvalidRepositoriesError(tuple(invalid_repositories))
+
+        return resolved
+
+    async def async_refresh(
+        self,
+        *,
+        progress_callback: HacsRefreshProgressCallback | None = None,
+        repositories: tuple[str, ...] | None = None,
+    ) -> HacsRefreshResult:
+        """Refresh selected or all installed HACS repositories."""
         hacs = self._get_hacs()
 
         if hacs.queue.running or hacs.queue.has_pending_tasks:
             raise HacsQueueBusyError
 
-        repositories = list(hacs.repositories.list_downloaded)
+        repositories_to_refresh = self._resolve_repositories(
+            hacs,
+            repositories,
+        )
 
-        if not repositories:
+        processed = 0
+        successful = 0
+        failed = 0
+
+        def report_progress() -> None:
+            """Report the current refresh progress."""
+            if progress_callback is not None:
+                progress_callback(
+                    HacsRefreshProgress(
+                        total=len(repositories_to_refresh),
+                        processed=processed,
+                        successful=successful,
+                        failed=failed,
+                    )
+                )
+
+        report_progress()
+
+        if not repositories_to_refresh:
             return HacsRefreshResult(
                 repositories=0,
                 successful=0,
                 failed=0,
                 pending=0,
+                failed_repositories=(),
+                pending_repositories=(),
                 failures=(),
             )
 
-        successful = 0
+        repository_names: list[str] = []
+        repository_statuses: list[bool | None] = []
         failures: list[str] = []
 
         async def refresh_repository(
+            index: int,
             repository: Any,
+            repository_name: str,
         ) -> None:
             """Refresh one repository and record its result."""
-            nonlocal successful
+            nonlocal processed, successful, failed
 
             try:
                 await repository.update_repository(
@@ -83,18 +188,34 @@ class HacsAdapter:
                     force=True,
                 )
             except Exception as err:
-                repository_name = getattr(
-                    repository.data,
-                    "full_name",
-                    str(repository),
-                )
+                repository_statuses[index] = False
                 failures.append(f"{repository_name}: {err}")
+                failed += 1
+                processed += 1
+                report_progress()
                 raise
+            else:
+                repository_statuses[index] = True
+                successful += 1
+                processed += 1
+                report_progress()
 
-            successful += 1
+        for index, repository in enumerate(repositories_to_refresh):
+            repository_name = getattr(
+                repository.data,
+                "full_name",
+                str(repository),
+            )
+            repository_names.append(repository_name)
+            repository_statuses.append(None)
 
-        for repository in repositories:
-            hacs.queue.add(refresh_repository(repository))
+            hacs.queue.add(
+                refresh_repository(
+                    index,
+                    repository,
+                    repository_name,
+                )
+            )
 
         try:
             await hacs.async_process_queue()
@@ -104,12 +225,28 @@ class HacsAdapter:
             for coordinator in hacs.coordinators.values():
                 coordinator.async_update_listeners()
 
-        pending = hacs.queue.pending_tasks
+        successful = 0
+        failed_repositories: list[str] = []
+        pending_repositories: list[str] = []
+
+        for repository_name, status in zip(
+            repository_names,
+            repository_statuses,
+            strict=True,
+        ):
+            if status is True:
+                successful += 1
+            elif status is False:
+                failed_repositories.append(repository_name)
+            else:
+                pending_repositories.append(repository_name)
 
         return HacsRefreshResult(
-            repositories=len(repositories),
+            repositories=len(repository_names),
             successful=successful,
-            failed=len(failures),
-            pending=pending,
+            failed=len(failed_repositories),
+            pending=len(pending_repositories),
+            failed_repositories=tuple(failed_repositories),
+            pending_repositories=tuple(pending_repositories),
             failures=tuple(failures),
         )

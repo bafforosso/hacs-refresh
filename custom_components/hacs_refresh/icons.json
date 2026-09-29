@@ -11,8 +11,16 @@
       }
     },
     "sensor": {
+      "progress": {
+        "default": "mdi:progress-clock"
+      },
       "status": {
         "default": "mdi:refresh-circle"
+      }
+    },
+    "switch": {
+      "automatic_refresh": {
+        "default": "mdi:refresh-auto"
       }
     }
   }

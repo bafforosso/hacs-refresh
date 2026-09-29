@@ -1,14 +1,16 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
-    CONF_AUTOMATIC_REFRESH,
-    CONF_DAYS,
-    CONF_TIMES,
+    PROGRESS_SENSOR_UNIQUE_ID,
+    STATUS_SENSOR_UNIQUE_ID,
 )
+from custom_components.hacs_refresh.hacs import HacsRefreshProgress
 from custom_components.hacs_refresh.sensor import (
+    HacsRefreshProgressSensor,
     HacsRefreshStatusSensor,
     async_setup_entry,
 )
@@ -24,13 +26,14 @@ def test_status_sensor_initializes() -> None:
 
     assert sensor.runtime is runtime
     assert sensor.native_value == "idle"
-    assert sensor.unique_id == "hacs_refresh_status"
+    assert sensor.unique_id == STATUS_SENSOR_UNIQUE_ID
     assert sensor._attr_translation_key == "status"
+    assert sensor.entity_category is None
     runtime.add_listener.assert_not_called()
 
 
-async def test_status_sensor_setup_entry(hass: HomeAssistant) -> None:
-    """Test that the status sensor is created for the config entry."""
+async def test_sensor_setup_entry(hass: HomeAssistant) -> None:
+    """Test that the sensors are created for the config entry."""
     runtime = MagicMock()
     entry = MagicMock()
     entry.runtime_data = runtime
@@ -40,9 +43,11 @@ async def test_status_sensor_setup_entry(hass: HomeAssistant) -> None:
 
     add_entities.assert_called_once()
     entities = add_entities.call_args.args[0]
-    assert len(entities) == 1
+
+    assert len(entities) == 2
     assert isinstance(entities[0], HacsRefreshStatusSensor)
-    assert entities[0].runtime is runtime
+    assert isinstance(entities[1], HacsRefreshProgressSensor)
+    assert all(entity.runtime is runtime for entity in entities)
 
 
 async def test_status_sensor_registers_runtime_listener() -> None:
@@ -61,26 +66,14 @@ async def test_status_sensor_registers_runtime_listener() -> None:
     mock_async_on_remove.assert_called_once_with(remove_listener)
 
 
-def test_status_sensor_extra_state_attributes(freezer) -> None:
-    """Test that the status sensor exposes runtime information."""
-    freezer.move_to("2026-09-04 10:00:00+00:00")
-
+def test_status_sensor_has_no_extra_state_attributes() -> None:
+    """Test that the status sensor exposes no extra state attributes."""
     runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["mon", "wed", "fri"],
-        CONF_TIMES: ["02:30", "14:00"],
-    }
+    runtime.state = "idle"
 
     sensor = HacsRefreshStatusSensor(runtime)
-    attributes = sensor.extra_state_attributes
 
-    assert attributes == {
-        "automatic_refresh": True,
-        "schedule_days": ["mon", "wed", "fri"],
-        "schedule_times": ["02:30", "14:00"],
-        "next_refresh": "2026-09-04T14:00:00+00:00",
-    }
+    assert sensor.extra_state_attributes is None
 
 
 def test_status_sensor_runtime_update_writes_state() -> None:
@@ -97,43 +90,108 @@ def test_status_sensor_runtime_update_writes_state() -> None:
     mock_write_state.assert_called_once_with()
 
 
-def test_status_sensor_next_refresh_disabled() -> None:
-    """Test that next_refresh is unavailable when automatic refresh is disabled."""
+@pytest.mark.parametrize(
+    ("progress", "expected"),
+    [
+        (None, None),
+        (
+            HacsRefreshProgress(
+                total=3,
+                processed=0,
+                successful=0,
+                failed=0,
+            ),
+            0,
+        ),
+        (
+            HacsRefreshProgress(
+                total=3,
+                processed=1,
+                successful=1,
+                failed=0,
+            ),
+            33,
+        ),
+        (
+            HacsRefreshProgress(
+                total=3,
+                processed=2,
+                successful=1,
+                failed=1,
+            ),
+            66,
+        ),
+        (
+            HacsRefreshProgress(
+                total=3,
+                processed=3,
+                successful=2,
+                failed=1,
+            ),
+            100,
+        ),
+        (
+            HacsRefreshProgress(
+                total=0,
+                processed=0,
+                successful=0,
+                failed=0,
+            ),
+            100,
+        ),
+    ],
+)
+def test_progress_sensor_value(
+    progress: HacsRefreshProgress | None,
+    expected: int | None,
+) -> None:
+    """Test that the progress sensor reports the expected value."""
     runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: False,
-        CONF_DAYS: ["mon", "wed", "fri"],
-        CONF_TIMES: ["02:30"],
-    }
+    runtime.entry.entry_id = "test-entry"
+    runtime.refresh_progress = progress
 
-    sensor = HacsRefreshStatusSensor(runtime)
+    sensor = HacsRefreshProgressSensor(runtime)
 
-    assert sensor.extra_state_attributes["next_refresh"] is None
+    assert sensor.native_value == expected
+    assert sensor.unique_id == PROGRESS_SENSOR_UNIQUE_ID
+    assert sensor._attr_translation_key == "progress"
+    assert sensor.native_unit_of_measurement == "%"
+    assert sensor.entity_category is None
+    assert sensor.should_poll is False
 
 
-def test_status_sensor_next_refresh_without_schedule() -> None:
-    """Test that next_refresh is unavailable without a schedule."""
+async def test_progress_sensor_registers_runtime_listener() -> None:
+    """Test that the progress sensor registers its runtime listener."""
     runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: [],
-        CONF_TIMES: [],
-    }
+    runtime.entry.entry_id = "test-entry"
+    remove_listener = MagicMock()
+    runtime.add_progress_listener.return_value = remove_listener
 
-    sensor = HacsRefreshStatusSensor(runtime)
+    sensor = HacsRefreshProgressSensor(runtime)
 
-    assert sensor.extra_state_attributes["next_refresh"] is None
+    with patch.object(sensor, "async_on_remove") as mock_async_on_remove:
+        await sensor.async_added_to_hass()
+
+    runtime.add_progress_listener.assert_called_once_with(
+        sensor._async_progress_updated
+    )
+    mock_async_on_remove.assert_called_once_with(remove_listener)
 
 
-def test_status_sensor_next_refresh_without_valid_schedule_day() -> None:
-    """Test that next_refresh is unavailable when no valid schedule day is configured."""
+def test_progress_sensor_update_writes_state() -> None:
+    """Test that a progress update causes the sensor to write its state."""
     runtime = MagicMock()
-    runtime.options = {
-        CONF_AUTOMATIC_REFRESH: True,
-        CONF_DAYS: ["invalid"],
-        CONF_TIMES: ["02:30"],
-    }
+    runtime.entry.entry_id = "test-entry"
+    runtime.refresh_progress = HacsRefreshProgress(
+        total=2,
+        processed=1,
+        successful=1,
+        failed=0,
+    )
 
-    sensor = HacsRefreshStatusSensor(runtime)
+    sensor = HacsRefreshProgressSensor(runtime)
 
-    assert sensor.extra_state_attributes["next_refresh"] is None
+    with patch.object(Entity, "async_write_ha_state") as mock_write_state:
+        sensor._async_progress_updated(runtime.refresh_progress)
+
+    mock_write_state.assert_called_once_with()

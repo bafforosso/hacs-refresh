@@ -11,6 +11,9 @@ from custom_components.hacs_refresh.const import (
     DEFAULT_DAYS,
     DEFAULT_TIMES,
     DOMAIN,
+    EVENT_TYPE_SUCCESS,
+    REFRESH_SOURCE_MANUAL,
+    STATE_IDLE,
 )
 from custom_components.hacs_refresh.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -35,7 +38,7 @@ async def test_diagnostics_default_values(
             CONF_TIMES: DEFAULT_TIMES,
         },
         "runtime": {
-            "state": "idle",
+            "state": STATE_IDLE,
             "last_completed": None,
             "last_result": None,
             "last_source": None,
@@ -80,7 +83,7 @@ async def test_diagnostics_runtime_state(
     runtime = HacsRefreshRuntimeData(hass, entry)
     entry.runtime_data = runtime
 
-    runtime.state = "idle"
+    runtime.state = STATE_IDLE
     runtime.last_completed = datetime(
         2026,
         1,
@@ -89,8 +92,8 @@ async def test_diagnostics_runtime_state(
         30,
         tzinfo=UTC,
     )
-    runtime.last_result = "success"
-    runtime.last_source = "manual"
+    runtime.last_result = EVENT_TYPE_SUCCESS
+    runtime.last_source = REFRESH_SOURCE_MANUAL
     runtime.last_repositories = 5
     runtime.last_successful = 4
     runtime.last_failed = 1
@@ -100,10 +103,10 @@ async def test_diagnostics_runtime_state(
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
 
     assert diagnostics["runtime"] == {
-        "state": "idle",
+        "state": STATE_IDLE,
         "last_completed": "2026-01-01T02:30:00+00:00",
-        "last_result": "success",
-        "last_source": "manual",
+        "last_result": EVENT_TYPE_SUCCESS,
+        "last_source": REFRESH_SOURCE_MANUAL,
         "last_repositories": 5,
         "last_successful": 4,
         "last_failed": 1,

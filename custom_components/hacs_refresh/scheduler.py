@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_AUTOMATIC_REFRESH,
@@ -34,6 +35,12 @@ class HacsRefreshScheduler:
         self.runtime = runtime
 
         self._unsubscribers: list[Callable[[], None]] = []
+        self._next_refresh: datetime | None = None
+
+    @property
+    def next_refresh(self) -> datetime | None:
+        """Return the next scheduled automatic refresh."""
+        return self._next_refresh
 
     async def async_setup(self) -> None:
         """Set up the configured schedule."""
@@ -64,6 +71,8 @@ class HacsRefreshScheduler:
                 )
             )
 
+        self._next_refresh = self._calculate_next_refresh(dt_util.now())
+
         _LOGGER.debug(
             "Configured HACS automatic refresh: days=%s times=%s",
             options.get(CONF_DAYS, []),
@@ -77,6 +86,64 @@ class HacsRefreshScheduler:
             unsubscribe()
 
         self._unsubscribers.clear()
+        self._next_refresh = None
+
+    def _calculate_next_refresh(
+        self,
+        now: datetime,
+    ) -> datetime | None:
+        """Calculate the next scheduled automatic refresh."""
+        options = self.runtime.options
+
+        if not options.get(
+            CONF_AUTOMATIC_REFRESH,
+            False,
+        ):
+            return None
+
+        days = set(
+            options.get(
+                CONF_DAYS,
+                [],
+            )
+        )
+        times = options.get(
+            CONF_TIMES,
+            [],
+        )
+
+        if not days or not times:
+            return None
+
+        candidates: list[datetime] = []
+
+        for day_offset in range(8):
+            candidate_date = now.date() + timedelta(days=day_offset)
+
+            weekday = WEEKDAYS[candidate_date.weekday()]
+
+            if weekday not in days:
+                continue
+
+            for time_string in times:
+                hour, minute = (int(value) for value in time_string.split(":"))
+
+                candidate = datetime(
+                    candidate_date.year,
+                    candidate_date.month,
+                    candidate_date.day,
+                    hour,
+                    minute,
+                    tzinfo=now.tzinfo,
+                )
+
+                if candidate > now:
+                    candidates.append(candidate)
+
+        if not candidates:
+            return None
+
+        return min(candidates)
 
     @callback
     def _handle_scheduled_time(
@@ -101,6 +168,9 @@ class HacsRefreshScheduler:
 
         if WEEKDAYS[now.weekday()] not in days:
             return
+
+        self._next_refresh = self._calculate_next_refresh(now)
+        self.runtime.notify_listeners()
 
         if self.runtime.refresh_in_progress:
             _LOGGER.warning(
