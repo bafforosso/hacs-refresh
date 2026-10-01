@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
@@ -125,6 +126,47 @@ def test_automatic_refresh_switch_runtime_update_writes_state() -> None:
         switch._async_runtime_updated()
 
     mock_write_state.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("days", "times"),
+    [
+        ([], ["02:30"]),
+        (["mon"], []),
+        ([], []),
+    ],
+)
+async def test_automatic_refresh_switch_rejects_incomplete_schedule(
+    hass: HomeAssistant,
+    days: list[str],
+    times: list[str],
+) -> None:
+    """Test that automatic refresh cannot be enabled without a complete schedule."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: False,
+            CONF_DAYS: days,
+            CONF_TIMES: times,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    runtime = MagicMock()
+    runtime.entry = entry
+
+    switch = HacsRefreshAutomaticRefreshSwitch(runtime)
+    switch.hass = hass
+
+    with pytest.raises(ServiceValidationError) as err:
+        await switch.async_turn_on()
+
+    assert err.value.translation_key == "automatic_refresh_schedule_required"
+    assert entry.options == {
+        CONF_AUTOMATIC_REFRESH: False,
+        CONF_DAYS: days,
+        CONF_TIMES: times,
+    }
 
 
 @pytest.mark.parametrize(

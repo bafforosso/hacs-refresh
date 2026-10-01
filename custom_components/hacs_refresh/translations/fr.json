@@ -59,6 +59,9 @@
     }
   },
   "exceptions": {
+    "automatic_refresh_schedule_required": {
+      "message": "Au moins un jour et une heure d’actualisation doivent être configurés avant de pouvoir activer l’actualisation automatique."
+    },
     "hacs_disabled": {
       "message": "HACS est désactivé."
     },

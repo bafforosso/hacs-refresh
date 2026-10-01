@@ -79,6 +79,15 @@ class HacsRefreshOutcome:
             "duration": self.duration,
         }
 
+    def as_event_data(self) -> JsonObjectType:
+        """Return the outcome as event data."""
+        data = self.as_dict()
+        if not self.failed_repositories:
+            data.pop("failed_repositories")
+        if not self.pending_repositories:
+            data.pop("pending_repositories")
+        return data
+
 
 class HacsRefreshRuntimeData:
     """Runtime data for HACS Refresh."""
@@ -195,7 +204,7 @@ class HacsRefreshRuntimeData:
 
         event_data: dict[str, Any] = {
             "source": self.last_source,
-            **outcome.as_dict(),
+            **outcome.as_event_data(),
         }
         if self.last_message is not None:
             event_data["message"] = self.last_message

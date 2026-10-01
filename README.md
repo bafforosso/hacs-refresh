@@ -201,8 +201,8 @@ Its `attributes` provide further details about the refresh:
 | `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
 | `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
-| `failed_repositories` | `list[str]` | Always | Repository full names | Repositories that failed to refresh. |
-| `pending_repositories` | `list[str]` | Always | Repository full names | Repositories that were not processed. |
+| `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories that failed to refresh. Included only when one or more repositories failed. |
+| `pending_repositories` | `list[str]` | Conditional | Repository full names | Repositories that were not processed. Included only when one or more repositories remain pending. |
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.

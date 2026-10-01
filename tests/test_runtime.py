@@ -841,8 +841,6 @@ def test_runtime_event_listener_can_be_added_and_removed(
             "successful": 1,
             "failed": 0,
             "pending": 0,
-            "failed_repositories": [],
-            "pending_repositories": [],
             "duration": 2.5,
         },
     )
