@@ -6,6 +6,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -13,6 +14,7 @@ from .const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    DOMAIN,
 )
 from .entity import HacsRefreshEntity
 from .runtime import HacsRefreshRuntimeData
@@ -88,10 +90,18 @@ class HacsRefreshAutomaticRefreshSwitch(
 
     async def async_turn_on(self, **kwargs: object) -> None:
         """Enable automatic refreshes."""
+        options = self.runtime.entry.options
+
+        if not options.get(CONF_DAYS) or not options.get(CONF_TIMES):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="automatic_refresh_schedule_required",
+            )
+
         self.hass.config_entries.async_update_entry(
             self.runtime.entry,
             options={
-                **self.runtime.entry.options,
+                **options,
                 CONF_AUTOMATIC_REFRESH: True,
             },
         )

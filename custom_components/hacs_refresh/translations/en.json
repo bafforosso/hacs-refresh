@@ -59,6 +59,9 @@
     }
   },
   "exceptions": {
+    "automatic_refresh_schedule_required": {
+      "message": "At least one day and one refresh time must be configured before automatic refresh can be enabled."
+    },
     "hacs_disabled": {
       "message": "HACS is disabled."
     },
