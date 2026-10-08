@@ -182,7 +182,8 @@ def _validate_refresh_intervals(times: list[str]) -> None:
 
 CONFIG_FLOW = {
     "user": SchemaFlowFormStep(
-        schema=_options_schema,
+        # Keep the voluptuous API for compatibility with HA <2026.9.
+        schema=_options_schema,  # type: ignore[arg-type]
         suggested_values=_suggested_values,
         validate_user_input=_validate_options,
     ),
@@ -191,7 +192,8 @@ CONFIG_FLOW = {
 
 OPTIONS_FLOW = {
     "init": SchemaFlowFormStep(
-        schema=_options_schema,
+        # Keep the voluptuous API for compatibility with HA <2026.9.
+        schema=_options_schema,  # type: ignore[arg-type]
         suggested_values=_suggested_values,
         validate_user_input=_validate_options,
     ),

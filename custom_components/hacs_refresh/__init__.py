@@ -102,7 +102,8 @@ async def async_setup(
         DOMAIN,
         SERVICE_REFRESH,
         async_refresh,
-        schema=SERVICE_REFRESH_SCHEMA,
+        # Keep the voluptuous API for compatibility with HA <2026.9.
+        schema=SERVICE_REFRESH_SCHEMA,  # type: ignore[arg-type]
         supports_response=SupportsResponse.OPTIONAL,
     )
 
