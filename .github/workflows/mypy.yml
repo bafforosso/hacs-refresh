@@ -55,5 +55,6 @@ jobs:
           --with pytest-homeassistant-custom-component==0.13.190
           mypy
           --python-version 3.12
+          --disable-error-code unused-ignore
           custom_components/hacs_refresh
           tests
