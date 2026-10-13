@@ -64,7 +64,7 @@ Alternatively, you can add the repository manually:
 4. Go to **Settings → Devices & services → Add integration**.
 5. Search for **HACS Refresh** and configure it.
 
-## Configuration
+## Automatic Refresh Configuration
 
 HACS Refresh automatically refreshes all installed HACS repositories according to the configured schedule.
 
@@ -77,6 +77,8 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 The automatic refresh settings can be configured during setup or later through the integration's configuration. It can also be enabled or disabled at any time using the **Automatic refresh** switch.
 
 <sub>*When automatic refresh is enabled, at least one day and one time must be configured. Up to 10 refresh times can be configured, and each refresh time must be at least 10 minutes apart.*</sub>
+
+Skipped scheduled refreshes are not retried or caught up after a restart. The next attempt occurs at the next configured time.
 
 ## Manual Refresh
 

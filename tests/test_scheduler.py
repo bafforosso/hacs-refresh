@@ -375,34 +375,60 @@ async def test_scheduler_skips_when_days_are_not_configured(
     mock_refresh.assert_not_awaited()
 
 
-async def test_scheduler_skips_when_refresh_is_in_progress(
+async def test_scheduler_skips_missed_times_and_resumes_at_next_schedule(
     hass: HomeAssistant,
 ) -> None:
-    """Test that a scheduled refresh is skipped while another is running."""
+    """Test missed times are not queued and the next regular time still runs."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         options={
             CONF_AUTOMATIC_REFRESH: True,
             CONF_DAYS: ["mon"],
-            CONF_TIMES: ["03:00"],
+            CONF_TIMES: ["03:00", "15:00"],
         },
     )
 
     runtime = HacsRefreshRuntimeData(hass, entry)
     scheduler = HacsRefreshScheduler(hass, runtime)
 
-    async with runtime._refresh_lock:
-        assert runtime.refresh_in_progress is True
-
-        with patch.object(
+    with (
+        patch.object(
+            runtime,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch.object(
             entry,
             "async_create_background_task",
-        ) as create_task_mock:
-            scheduler._handle_scheduled_time(
-                datetime(2026, 8, 31, 3, 0),  # noqa: DTZ001
-            )
+        ) as create_task_mock,
+    ):
+        async with runtime._refresh_lock:
+            assert runtime.refresh_in_progress is True
 
-        create_task_mock.assert_not_called()
+            scheduler._handle_scheduled_time(
+                datetime(2026, 8, 31, 3, 0, tzinfo=UTC),
+            )
+            assert scheduler.next_refresh == datetime(2026, 8, 31, 15, 0, tzinfo=UTC)
+
+            scheduler._handle_scheduled_time(
+                datetime(2026, 8, 31, 15, 0, tzinfo=UTC),
+            )
+            assert scheduler.next_refresh == datetime(2026, 9, 7, 3, 0, tzinfo=UTC)
+
+            create_task_mock.assert_not_called()
+
+        # The next configured time is a fresh opportunity, not a catch-up run.
+        scheduler._handle_scheduled_time(
+            datetime(2026, 9, 7, 3, 0, tzinfo=UTC),
+        )
+
+        create_task_mock.assert_called_once()
+        assert scheduler.next_refresh == datetime(2026, 9, 7, 15, 0, tzinfo=UTC)
+
+        refresh_coroutine = create_task_mock.call_args.args[1]
+        await refresh_coroutine
+
+    mock_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_SCHEDULED)
 
 
 def test_scheduler_unload_removes_registered_listeners(

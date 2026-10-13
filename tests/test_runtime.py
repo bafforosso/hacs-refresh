@@ -1389,6 +1389,46 @@ async def test_refresh_preserves_last_completed_state_while_running(
         assert runtime.last_duration == 2.5
 
 
+@pytest.mark.parametrize(
+    ("hacs_error", "expected_log"),
+    [
+        (
+            HacsUnavailableError,
+            "Scheduled HACS refresh could not run because HACS is unavailable",
+        ),
+        (
+            HacsDisabledError,
+            "Scheduled HACS refresh could not run because HACS is disabled",
+        ),
+    ],
+)
+async def test_scheduled_refresh_is_skipped_when_hacs_cannot_run(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    hacs_error: type[Exception],
+    expected_log: str,
+) -> None:
+    """Test that unavailable or disabled HACS skips without retrying."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        side_effect=hacs_error,
+    ) as mock_refresh:
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_SCHEDULED)
+
+    assert outcome is None
+    mock_refresh.assert_awaited_once()
+    assert expected_log in caplog.text
+    assert "Scheduled HACS refresh failed" not in caplog.text
+    assert runtime.state == STATE_IDLE
+    assert runtime.last_completed is None
+    assert runtime.last_result is None
+
+
 async def test_scheduled_refresh_suppresses_unexpected_error(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,

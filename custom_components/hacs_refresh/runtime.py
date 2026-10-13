@@ -274,9 +274,20 @@ class HacsRefreshRuntimeData:
                     if source == REFRESH_SOURCE_SCHEDULED:
                         return None
                     raise
-                except HomeAssistantError:
+                except HomeAssistantError as err:
                     if source == REFRESH_SOURCE_SCHEDULED:
-                        _LOGGER.error("Scheduled HACS refresh failed")
+                        if err.translation_key == "hacs_unavailable":
+                            _LOGGER.warning(
+                                "Scheduled HACS refresh could not run because "
+                                "HACS is unavailable"
+                            )
+                        elif err.translation_key == "hacs_disabled":
+                            _LOGGER.warning(
+                                "Scheduled HACS refresh could not run because "
+                                "HACS is disabled"
+                            )
+                        else:
+                            _LOGGER.error("Scheduled HACS refresh failed")
                         return None
                     raise
         finally:
