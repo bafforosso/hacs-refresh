@@ -104,12 +104,14 @@ The response `data` contains:
 | Field | Type | Description |
 | --- | :---: | --- |
 | `repositories` | `int` | Total number of repositories included in the refresh. |
-| `successful` | `int` | Number of repository update calls that returned without raising an exception. This does not guarantee that all underlying GitHub/API requests succeeded. |
+| `successful` | `int` | Number of repository update calls that returned without raising an exception. |
 | `failed` | `int` | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Number of repositories that were not processed. |
 | `failed_repositories` | `list[str]` | Full names of repositories whose update calls raised an exception reaching HACS Refresh. |
 | `pending_repositories` | `list[str]` | Full names of repositories whose queued update tasks had not executed when the refresh result was finalized. |
 | `duration` | `float` | Refresh duration in seconds. |
+
+A completed refresh returns its result data even when repositories fail or remain pending. Exceptions are raised if the refresh cannot produce a completed result or the repository selection is invalid.
 
 > [!WARNING]
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
@@ -187,7 +189,7 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | All repository update calls returned without raising an exception, and no repositories remained pending. This does not guarantee that every underlying GitHub/API request succeeded, because HACS may handle some failures internally. |
+| `success` | No repository update calls raised an exception, and no repositories remained pending. |
 | `partial` | One or more repository update tasks remained pending when the refresh result was finalized. The result may also include repository failures. |
 | `failed` | One or more repository update calls raised an exception reaching HACS Refresh, and no repositories remained pending. |
 
@@ -200,7 +202,7 @@ Its `attributes` provide further details about the refresh:
 | `source` | `str` | Always | `scheduled`, `manual` | What triggered the refresh. |
 | `duration` | `float` | Always | Seconds | Duration of the completed refresh. |
 | `repositories` | `int` | Always | ≥ 0 | Total number of repositories included in the refresh. |
-| `successful` | `int` | Always | ≥ 0 | Number of repository update calls that returned without raising an exception. This does not guarantee that all underlying GitHub/API requests succeeded. |
+| `successful` | `int` | Always | ≥ 0 | Number of repository update calls that returned without raising an exception. |
 | `failed` | `int` | Always | ≥ 0 | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
 | `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories whose update calls raised an exception reaching HACS Refresh. Included only when one or more repositories failed. |
