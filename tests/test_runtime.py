@@ -197,6 +197,30 @@ def test_runtime_listener_can_be_added_and_removed(
     listener.assert_called_once_with()
 
 
+def test_runtime_listener_error_does_not_prevent_other_listeners(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that a failing runtime listener does not block other listeners."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    failing_listener = MagicMock(
+        side_effect=RuntimeError("Listener failed"),
+    )
+    successful_listener = MagicMock()
+
+    runtime.add_listener(failing_listener)
+    runtime.add_listener(successful_listener)
+
+    runtime.notify_listeners()
+
+    failing_listener.assert_called_once_with()
+    successful_listener.assert_called_once_with()
+    assert "Unexpected error notifying listener" in caplog.text
+    assert "Listener failed" in caplog.text
+
+
 def test_runtime_progress_listener_can_be_added_and_removed(
     hass: HomeAssistant,
 ) -> None:
@@ -577,6 +601,60 @@ async def test_refresh_tracks_progress(
 
     # Progress updates must not notify the existing runtime listeners.
     assert runtime_states == [STATE_REFRESHING, STATE_IDLE]
+
+
+async def test_progress_listener_error_does_not_interrupt_refresh_cleanup(
+    hass: HomeAssistant,
+) -> None:
+    """Test that progress listener errors do not interrupt refresh cleanup."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    progress = HacsRefreshProgress(
+        total=1,
+        processed=1,
+        successful=1,
+        failed=0,
+    )
+    failing_listener = MagicMock(
+        side_effect=RuntimeError("Progress listener failed"),
+    )
+    successful_listener = MagicMock()
+    runtime_listener = MagicMock()
+
+    runtime.add_progress_listener(failing_listener)
+    runtime.add_progress_listener(successful_listener)
+    runtime.add_listener(runtime_listener)
+
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
+    ) -> HacsRefreshResult:
+        progress_callback(progress)
+        return _refresh_result()
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new=async_refresh,
+    ):
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+    assert outcome is not None
+    assert outcome.successful == 1
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_progress is None
+
+    assert failing_listener.call_count == 2
+    failing_listener.assert_any_call(progress)
+    failing_listener.assert_any_call(None)
+
+    assert successful_listener.call_count == 2
+    successful_listener.assert_any_call(progress)
+    successful_listener.assert_any_call(None)
+
+    assert runtime_listener.call_count == 2
 
 
 async def test_late_progress_callback_from_previous_run_is_ignored(
@@ -977,6 +1055,40 @@ def test_runtime_event_listener_can_be_added_and_removed(
 
     runtime._notify_refresh_completed(outcome)
     listener.assert_called_once()
+
+
+async def test_event_listener_error_does_not_prevent_other_listeners(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a failing event listener does not block other listeners."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    failing_listener = MagicMock(
+        side_effect=RuntimeError("Event listener failed"),
+    )
+    successful_listener = MagicMock()
+
+    runtime.add_event_listener(failing_listener)
+    runtime.add_event_listener(successful_listener)
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        return_value=_refresh_result(),
+    ):
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+    assert outcome is not None
+    assert outcome.successful == 1
+    assert runtime.last_result == EVENT_TYPE_SUCCESS
+
+    failing_listener.assert_called_once()
+    successful_listener.assert_called_once()
+
+    assert failing_listener.call_args == successful_listener.call_args
+    assert successful_listener.call_args.args[0] == EVENT_TYPE_SUCCESS
 
 
 async def test_refresh_fails_on_unexpected_error(

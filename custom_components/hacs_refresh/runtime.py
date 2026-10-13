@@ -131,6 +131,20 @@ class HacsRefreshRuntimeData:
         """Return whether a refresh is currently in progress."""
         return self._refresh_lock.locked()
 
+    @staticmethod
+    def _notify_listener(
+        listener: Callable[..., None],
+        *args: Any,
+    ) -> None:
+        """Notify one listener without disrupting other listeners."""
+        try:
+            listener(*args)
+        except Exception:
+            _LOGGER.exception(
+                "Unexpected error notifying listener %s",
+                listener,
+            )
+
     @callback
     def _async_update_refresh_progress(
         self,
@@ -144,7 +158,7 @@ class HacsRefreshRuntimeData:
 
         self.refresh_progress = progress
         for listener in tuple(self._progress_listeners):
-            listener(progress)
+            self._notify_listener(listener, progress)
 
     async def async_initialize(self) -> None:
         """Restore persistent refresh state."""
@@ -216,12 +230,16 @@ class HacsRefreshRuntimeData:
             event_data["message"] = self.last_message
 
         for listener in tuple(self._event_listeners):
-            listener(self.last_result, event_data)
+            self._notify_listener(
+                listener,
+                self.last_result,
+                event_data,
+            )
 
     def notify_listeners(self) -> None:
         """Notify listeners of a runtime or configuration change."""
         for listener in tuple(self._listeners):
-            listener()
+            self._notify_listener(listener)
 
     async def async_refresh(
         self,
@@ -266,7 +284,7 @@ class HacsRefreshRuntimeData:
                 if self.refresh_progress is not None:
                     self.refresh_progress = None
                     for listener in tuple(self._progress_listeners):
-                        listener(None)
+                        self._notify_listener(listener, None)
                 self.notify_listeners()
 
     async def _async_refresh(
