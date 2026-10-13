@@ -109,6 +109,7 @@ class HacsRefreshRuntimeData:
         self._event_listeners: set[RefreshEventListener] = set()
         self.state = STATE_IDLE
         self.refresh_progress: HacsRefreshProgress | None = None
+        self._active_progress_token: object | None = None
         self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
@@ -130,15 +131,34 @@ class HacsRefreshRuntimeData:
         """Return whether a refresh is currently in progress."""
         return self._refresh_lock.locked()
 
+    @staticmethod
+    def _notify_listener(
+        listener: Callable[..., None],
+        *args: Any,
+    ) -> None:
+        """Notify one listener without disrupting other listeners."""
+        try:
+            listener(*args)
+        except Exception:
+            _LOGGER.exception(
+                "Unexpected error notifying listener %s",
+                listener,
+            )
+
     @callback
     def _async_update_refresh_progress(
         self,
         progress: HacsRefreshProgress,
+        *,
+        token: object,
     ) -> None:
-        """Update the current HACS Refresh progress."""
+        """Update progress only for the active refresh run."""
+        if token is not self._active_progress_token:
+            return
+
         self.refresh_progress = progress
         for listener in tuple(self._progress_listeners):
-            listener(progress)
+            self._notify_listener(listener, progress)
 
     async def async_initialize(self) -> None:
         """Restore persistent refresh state."""
@@ -210,12 +230,16 @@ class HacsRefreshRuntimeData:
             event_data["message"] = self.last_message
 
         for listener in tuple(self._event_listeners):
-            listener(self.last_result, event_data)
+            self._notify_listener(
+                listener,
+                self.last_result,
+                event_data,
+            )
 
     def notify_listeners(self) -> None:
         """Notify listeners of a runtime or configuration change."""
         for listener in tuple(self._listeners):
-            listener()
+            self._notify_listener(listener)
 
     async def async_refresh(
         self,
@@ -250,9 +274,20 @@ class HacsRefreshRuntimeData:
                     if source == REFRESH_SOURCE_SCHEDULED:
                         return None
                     raise
-                except HomeAssistantError:
+                except HomeAssistantError as err:
                     if source == REFRESH_SOURCE_SCHEDULED:
-                        _LOGGER.error("Scheduled HACS refresh failed")
+                        if err.translation_key == "hacs_unavailable":
+                            _LOGGER.warning(
+                                "Scheduled HACS refresh could not run because "
+                                "HACS is unavailable"
+                            )
+                        elif err.translation_key == "hacs_disabled":
+                            _LOGGER.warning(
+                                "Scheduled HACS refresh could not run because "
+                                "HACS is disabled"
+                            )
+                        else:
+                            _LOGGER.error("Scheduled HACS refresh failed")
                         return None
                     raise
         finally:
@@ -260,7 +295,7 @@ class HacsRefreshRuntimeData:
                 if self.refresh_progress is not None:
                     self.refresh_progress = None
                     for listener in tuple(self._progress_listeners):
-                        listener(None)
+                        self._notify_listener(listener, None)
                 self.notify_listeners()
 
     async def _async_refresh(
@@ -284,6 +319,8 @@ class HacsRefreshRuntimeData:
             )
             return None
 
+        start = perf_counter()
+
         try:
             if repositories is not None:
                 repositories = self.hacs.validate_repositories(repositories)
@@ -292,12 +329,28 @@ class HacsRefreshRuntimeData:
             self.state = STATE_REFRESHING
             self.notify_listeners()
 
-            start = perf_counter()
+            progress_token = object()
+            self._active_progress_token = progress_token
 
-            result = await self.hacs.async_refresh(
-                progress_callback=self._async_update_refresh_progress,
-                repositories=repositories,
-            )
+            @callback
+            def update_refresh_progress(
+                progress: HacsRefreshProgress,
+            ) -> None:
+                """Forward progress for this refresh run only."""
+                self._async_update_refresh_progress(
+                    progress,
+                    token=progress_token,
+                )
+
+            try:
+                result = await self.hacs.async_refresh(
+                    progress_callback=update_refresh_progress,
+                    repositories=repositories,
+                )
+            finally:
+                if self._active_progress_token is progress_token:
+                    self._active_progress_token = None
+
         except asyncio.CancelledError:
             self.state = STATE_IDLE
             raise
@@ -399,10 +452,17 @@ class HacsRefreshRuntimeData:
 
         save_task = asyncio.create_task(self._store.async_save(data))
         try:
-            await asyncio.shield(save_task)
+            await asyncio.wait({save_task})
         except asyncio.CancelledError:
-            await save_task
+            try:
+                await save_task
+            except Exception:
+                _LOGGER.exception(
+                    "Unexpected error saving last refresh while handling cancellation"
+                )
             raise
+
+        save_task.result()
 
     async def _update_refresh_result(
         self,
@@ -458,12 +518,6 @@ class HacsRefreshRuntimeData:
                 outcome.pending,
             )
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="refresh_tasks_pending",
-                translation_placeholders={"pending": str(outcome.pending)},
-            )
-
         if outcome.failed:
             _LOGGER.error(
                 "HACS refresh failed for %d of %d repositories",
@@ -477,17 +531,11 @@ class HacsRefreshRuntimeData:
                     failure,
                 )
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="refresh_tasks_failed",
-                translation_placeholders={
-                    "failed": str(outcome.failed),
-                    "repositories": str(outcome.repositories),
-                },
+        if not outcome.pending and not outcome.failed:
+            _LOGGER.debug(
+                "HACS refresh completed without reported repository failures "
+                "for %d repositories",
+                outcome.repositories,
             )
 
-        _LOGGER.debug(
-            "HACS forced refresh completed successfully for %d repositories",
-            outcome.repositories,
-        )
         return outcome

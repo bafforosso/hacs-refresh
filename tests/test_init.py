@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryError,
     ConfigEntryNotReady,
+    HomeAssistantError,
     ServiceValidationError,
 )
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -115,24 +116,102 @@ async def test_refresh_service_supports_optional_response(
     )
 
 
+@pytest.mark.parametrize(
+    ("outcome", "expected_response"),
+    [
+        (
+            HacsRefreshOutcome(
+                repositories=2,
+                successful=2,
+                failed=0,
+                pending=0,
+                failed_repositories=(),
+                pending_repositories=(),
+                duration=2.5,
+            ),
+            {
+                "repositories": 2,
+                "successful": 2,
+                "failed": 0,
+                "pending": 0,
+                "failed_repositories": [],
+                "pending_repositories": [],
+                "duration": 2.5,
+            },
+        ),
+        (
+            HacsRefreshOutcome(
+                repositories=2,
+                successful=1,
+                failed=0,
+                pending=1,
+                failed_repositories=(),
+                pending_repositories=("example/pending-repository",),
+                duration=2.5,
+            ),
+            {
+                "repositories": 2,
+                "successful": 1,
+                "failed": 0,
+                "pending": 1,
+                "failed_repositories": [],
+                "pending_repositories": ["example/pending-repository"],
+                "duration": 2.5,
+            },
+        ),
+        (
+            HacsRefreshOutcome(
+                repositories=2,
+                successful=1,
+                failed=1,
+                pending=0,
+                failed_repositories=("example/failed-repository",),
+                pending_repositories=(),
+                duration=2.5,
+            ),
+            {
+                "repositories": 2,
+                "successful": 1,
+                "failed": 1,
+                "pending": 0,
+                "failed_repositories": ["example/failed-repository"],
+                "pending_repositories": [],
+                "duration": 2.5,
+            },
+        ),
+        (
+            HacsRefreshOutcome(
+                repositories=7,
+                successful=5,
+                failed=1,
+                pending=1,
+                failed_repositories=("example/failed-repository",),
+                pending_repositories=("example/pending-repository",),
+                duration=2.5,
+            ),
+            {
+                "repositories": 7,
+                "successful": 5,
+                "failed": 1,
+                "pending": 1,
+                "failed_repositories": ["example/failed-repository"],
+                "pending_repositories": ["example/pending-repository"],
+                "duration": 2.5,
+            },
+        ),
+    ],
+    ids=["success", "partial", "failed", "failed-and-pending"],
+)
 async def test_refresh_service_returns_response_data(
     hass: HomeAssistant,
+    outcome: HacsRefreshOutcome,
+    expected_response: dict[str, object],
 ) -> None:
-    """Test that the refresh service returns response data when requested."""
+    """Test response data for each completed refresh outcome."""
     await async_setup(hass, {})
 
     runtime = MagicMock()
-    runtime.async_refresh = AsyncMock(
-        return_value=HacsRefreshOutcome(
-            repositories=7,
-            successful=5,
-            failed=1,
-            pending=1,
-            failed_repositories=("example/failed-repository",),
-            pending_repositories=("example/pending-repository",),
-            duration=2.5,
-        )
-    )
+    runtime.async_refresh = AsyncMock(return_value=outcome)
     config_entry = MagicMock()
     config_entry.runtime_data = runtime
 
@@ -148,19 +227,22 @@ async def test_refresh_service_returns_response_data(
             return_response=True,
         )
 
-    assert response == {
-        "repositories": 7,
-        "successful": 5,
-        "failed": 1,
-        "pending": 1,
-        "failed_repositories": [
-            "example/failed-repository",
-        ],
-        "pending_repositories": [
-            "example/pending-repository",
-        ],
-        "duration": 2.5,
-    }
+    assert response == expected_response
+    assert isinstance(response, dict)
+    assert isinstance(response["repositories"], int)
+    assert isinstance(response["successful"], int)
+    assert isinstance(response["failed"], int)
+    assert isinstance(response["pending"], int)
+    assert isinstance(response["failed_repositories"], list)
+    assert all(
+        isinstance(repository, str) for repository in response["failed_repositories"]
+    )
+    assert isinstance(response["pending_repositories"], list)
+    assert all(
+        isinstance(repository, str) for repository in response["pending_repositories"]
+    )
+    assert isinstance(response["duration"], float)
+
     runtime.async_refresh.assert_awaited_once_with(
         source=REFRESH_SOURCE_MANUAL,
         repositories=None,
@@ -343,6 +425,41 @@ async def test_refresh_service_translates_invalid_repositories(
             "example/unknown-one",
             "example/unknown-two",
         ),
+    )
+
+
+async def test_refresh_service_propagates_execution_failure(
+    hass: HomeAssistant,
+) -> None:
+    """Test that runtime execution failures propagate to the service caller."""
+    await async_setup(hass, {})
+
+    expected_error = HomeAssistantError("Unexpected refresh failure")
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock(side_effect=expected_error)
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    with (
+        patch.object(
+            hass.config_entries,
+            "async_loaded_entries",
+            return_value=[entry],
+        ),
+        pytest.raises(HomeAssistantError) as err,
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            blocking=True,
+        )
+
+    assert err.value is expected_error
+
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=None,
     )
 
 

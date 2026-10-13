@@ -115,35 +115,41 @@ class HacsRefreshScheduler:
         if not days or not times:
             return None
 
+        now_utc = dt_util.as_utc(now)
         candidates: list[datetime] = []
 
-        for day_offset in range(8):
-            candidate_date = now.date() + timedelta(days=day_offset)
+        for time_string in times:
+            hour, minute = (int(value) for value in time_string.split(":"))
 
-            weekday = WEEKDAYS[candidate_date.weekday()]
+            # Advance by one real second, not one wall-clock second.
+            # This is important during the repeated hour at fall-back.
+            cursor = (now_utc + timedelta(seconds=1)).astimezone(now.tzinfo)
 
-            if weekday not in days:
-                continue
-
-            for time_string in times:
-                hour, minute = (int(value) for value in time_string.split(":"))
-
-                candidate = datetime(
-                    candidate_date.year,
-                    candidate_date.month,
-                    candidate_date.day,
-                    hour,
-                    minute,
-                    tzinfo=now.tzinfo,
+            # A weekly schedule may require up to eight occurrences to
+            # reach the next configured weekday. The extra iteration
+            # accounts for both occurrences of an ambiguous local time.
+            for _ in range(9):
+                candidate = dt_util.find_next_time_expression_time(
+                    cursor,
+                    [0],
+                    [minute],
+                    [hour],
                 )
+                candidate_utc = dt_util.as_utc(candidate)
 
-                if candidate > now:
+                if candidate_utc > now_utc and WEEKDAYS[candidate.weekday()] in days:
                     candidates.append(candidate)
+                    break
+
+                # Advance from the candidate by a real second to avoid
+                # repeating it, including when it belongs to the first
+                # occurrence of an ambiguous local time.
+                cursor = (candidate_utc + timedelta(seconds=1)).astimezone(now.tzinfo)
 
         if not candidates:
             return None
 
-        return min(candidates)
+        return min(candidates, key=dt_util.as_utc)
 
     @callback
     def _handle_scheduled_time(
