@@ -482,6 +482,58 @@ async def test_refresh_handles_unexpected_repository_validation_error(
     mock_refresh.assert_not_awaited()
 
 
+async def test_refresh_recovers_after_unexpected_repository_validation_error(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a refresh can succeed after an unexpected validation error."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    unexpected_error = RuntimeError("Repository validation failed")
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "validate_repositories",
+            side_effect=[
+                unexpected_error,
+                ("example/valid-repository",),
+            ],
+        ) as mock_validate,
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(),
+        ) as mock_refresh,
+    ):
+        with pytest.raises(HomeAssistantError) as exc_info:
+            await runtime.async_refresh(
+                source=REFRESH_SOURCE_MANUAL,
+                repositories=("example/repository",),
+            )
+
+        assert exc_info.value.translation_key == "unexpected_refresh_error"
+        assert exc_info.value.__cause__ is unexpected_error
+        assert runtime.state == STATE_IDLE
+        assert runtime.refresh_in_progress is False
+        assert runtime._refresh_lock.locked() is False
+
+        outcome = await runtime.async_refresh(
+            source=REFRESH_SOURCE_MANUAL,
+            repositories=("example/valid-repository",),
+        )
+
+    assert outcome is not None
+    assert outcome.repositories == 1
+    assert outcome.successful == 1
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_in_progress is False
+    assert runtime._refresh_lock.locked() is False
+
+    assert mock_validate.call_count == 2
+    mock_refresh.assert_awaited_once()
+
+
 async def test_refresh_does_not_start_when_repository_validation_fails(
     hass: HomeAssistant,
 ) -> None:
