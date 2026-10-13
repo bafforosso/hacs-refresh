@@ -64,7 +64,7 @@ Alternatively, you can add the repository manually:
 4. Go to **Settings → Devices & services → Add integration**.
 5. Search for **HACS Refresh** and configure it.
 
-## Configuration
+## Automatic Refresh Configuration
 
 HACS Refresh automatically refreshes all installed HACS repositories according to the configured schedule.
 
@@ -77,6 +77,8 @@ Refresh times must use the `HH:MM` format and be separated by commas. For exampl
 The automatic refresh settings can be configured during setup or later through the integration's configuration. It can also be enabled or disabled at any time using the **Automatic refresh** switch.
 
 <sub>*When automatic refresh is enabled, at least one day and one time must be configured. Up to 10 refresh times can be configured, and each refresh time must be at least 10 minutes apart.*</sub>
+
+Skipped scheduled refreshes are not retried or caught up after a restart. The next attempt occurs at the next configured time.
 
 ## Manual Refresh
 
@@ -104,12 +106,14 @@ The response `data` contains:
 | Field | Type | Description |
 | --- | :---: | --- |
 | `repositories` | `int` | Total number of repositories included in the refresh. |
-| `successful` | `int` | Number of repositories refreshed successfully. |
-| `failed` | `int` | Number of repositories that failed to refresh. |
+| `successful` | `int` | Number of repository update calls that returned without raising an exception. |
+| `failed` | `int` | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Number of repositories that were not processed. |
-| `failed_repositories` | `list[str]` | Full names of repositories that failed to refresh. |
-| `pending_repositories` | `list[str]` | Full names of repositories that were not processed. |
+| `failed_repositories` | `list[str]` | Full names of repositories whose update calls raised an exception reaching HACS Refresh. |
+| `pending_repositories` | `list[str]` | Full names of repositories whose queued update tasks had not executed when the refresh result was finalized. |
 | `duration` | `float` | Refresh duration in seconds. |
+
+A completed refresh returns its result data even when repositories fail or remain pending. Exceptions are raised if the refresh cannot produce a completed result or the repository selection is invalid.
 
 > [!WARNING]
 > Manual refreshes bypass refresh protection. Use the `hacs_refresh.refresh` action carefully when calling it from automations or scripts to avoid unintended repeated refreshes.
@@ -187,9 +191,11 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | The refresh completed successfully for all repositories included in the refresh. |
-| `partial` | The refresh completed with one or more repositories still pending. |
-| `failed` | The refresh completed with one or more repositories failing to refresh. |
+| `success` | No repository update calls raised an exception, and no repositories remained pending. |
+| `partial` | One or more repository update tasks remained pending when the refresh result was finalized. The result may also include repository failures. |
+| `failed` | One or more repository update calls raised an exception reaching HACS Refresh, and no repositories remained pending. |
+
+> **Result limitations:** HACS Refresh reports outcomes observable through the HACS repository update interface. HACS may handle some underlying GitHub/API failures internally without propagating an exception. Consequently, a `success` event means that no repository update call reported an exception and no repositories remained pending; it is not proof that every GitHub request succeeded.
 
 Its `attributes` provide further details about the refresh:
 
@@ -198,11 +204,11 @@ Its `attributes` provide further details about the refresh:
 | `source` | `str` | Always | `scheduled`, `manual` | What triggered the refresh. |
 | `duration` | `float` | Always | Seconds | Duration of the completed refresh. |
 | `repositories` | `int` | Always | ≥ 0 | Total number of repositories included in the refresh. |
-| `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
-| `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
+| `successful` | `int` | Always | ≥ 0 | Number of repository update calls that returned without raising an exception. |
+| `failed` | `int` | Always | ≥ 0 | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
-| `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories that failed to refresh. Included only when one or more repositories failed. |
-| `pending_repositories` | `list[str]` | Conditional | Repository full names | Repositories that were not processed. Included only when one or more repositories remain pending. |
+| `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories whose update calls raised an exception reaching HACS Refresh. Included only when one or more repositories failed. |
+| `pending_repositories` | `list[str]` | Conditional | Repository full names | Repositories whose queued update tasks had not executed when the refresh result was finalized. Included only when one or more repositories remain pending. |
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.
