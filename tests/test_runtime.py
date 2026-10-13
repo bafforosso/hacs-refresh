@@ -411,6 +411,53 @@ async def test_refresh_validates_repositories_before_starting(
     assert await_args.kwargs["repositories"] == ("example/valid-repository",)
 
 
+async def test_refresh_handles_unexpected_repository_validation_error(
+    hass: HomeAssistant,
+) -> None:
+    """Test that unexpected validation errors do not mask the original error."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    unexpected_error = RuntimeError("Repository validation failed")
+
+    with (
+        patch.object(
+            runtime.hacs,
+            "validate_repositories",
+            side_effect=unexpected_error,
+        ),
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch(
+            "custom_components.hacs_refresh.runtime.perf_counter",
+            side_effect=[10.0, 12.5],
+        ),
+        pytest.raises(HomeAssistantError) as exc_info,
+    ):
+        await runtime.async_refresh(
+            source=REFRESH_SOURCE_MANUAL,
+            repositories=("example/repository",),
+        )
+
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "unexpected_refresh_error"
+    assert exc_info.value.__cause__ is unexpected_error
+
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_progress is None
+    assert runtime.last_result == EVENT_TYPE_FAILED
+    assert runtime.last_source == REFRESH_SOURCE_MANUAL
+    assert runtime.last_duration == 2.5
+    assert runtime.last_repositories == 0
+    assert runtime.last_successful == 0
+    assert runtime.last_failed == 0
+    assert runtime.last_pending == 0
+
+    mock_refresh.assert_not_awaited()
+
+
 async def test_refresh_does_not_start_when_repository_validation_fails(
     hass: HomeAssistant,
 ) -> None:

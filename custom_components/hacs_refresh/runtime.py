@@ -290,6 +290,8 @@ class HacsRefreshRuntimeData:
             )
             return None
 
+        start = perf_counter()
+
         try:
             if repositories is not None:
                 repositories = self.hacs.validate_repositories(repositories)
@@ -298,7 +300,6 @@ class HacsRefreshRuntimeData:
             self.state = STATE_REFRESHING
             self.notify_listeners()
 
-            start = perf_counter()
             progress_token = object()
             self._active_progress_token = progress_token
 
