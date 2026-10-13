@@ -897,6 +897,58 @@ async def test_refresh_handles_cancellation_during_persistence(
     assert stored["pending"] == 0
 
 
+async def test_refresh_preserves_cancellation_when_persistence_fails(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that a persistence failure does not mask refresh cancellation."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    save_started = asyncio.Event()
+    release_save = asyncio.Event()
+
+    async def async_save(data: LastRefreshData) -> None:
+        save_started.set()
+        await release_save.wait()
+        raise RuntimeError("Storage write failed")
+
+    with (
+        patch.object(runtime._store, "async_save", new=async_save),
+        patch.object(
+            runtime.hacs,
+            "async_refresh",
+            new_callable=AsyncMock,
+            return_value=_refresh_result(),
+        ),
+    ):
+        refresh_task = asyncio.create_task(
+            runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        )
+
+        await save_started.wait()
+
+        assert runtime.last_result == EVENT_TYPE_SUCCESS
+        assert runtime.refresh_in_progress is True
+
+        refresh_task.cancel()
+        await asyncio.sleep(0)
+
+        assert refresh_task.done() is False
+
+        release_save.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await refresh_task
+
+    assert runtime.state == STATE_IDLE
+    assert runtime.refresh_in_progress is False
+    assert "Unexpected error saving last refresh while handling cancellation" in (
+        caplog.text
+    )
+    assert "Storage write failed" in caplog.text
+
+
 async def test_refresh_outcome_is_propagated_to_event(
     hass: HomeAssistant,
 ) -> None:

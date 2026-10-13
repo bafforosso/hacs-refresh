@@ -441,10 +441,17 @@ class HacsRefreshRuntimeData:
 
         save_task = asyncio.create_task(self._store.async_save(data))
         try:
-            await asyncio.shield(save_task)
+            await asyncio.wait({save_task})
         except asyncio.CancelledError:
-            await save_task
+            try:
+                await save_task
+            except Exception:
+                _LOGGER.exception(
+                    "Unexpected error saving last refresh while handling cancellation"
+                )
             raise
+
+        save_task.result()
 
     async def _update_refresh_result(
         self,
