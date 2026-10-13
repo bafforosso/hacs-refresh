@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -10,6 +11,7 @@ from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    DEFAULT_TIMES,
     DOMAIN,
     REFRESH_SOURCE_SCHEDULED,
 )
@@ -131,6 +133,82 @@ async def test_scheduler_next_refresh_rolls_over_to_next_configured_day(
         0,
         tzinfo=dt_util.get_default_time_zone(),
     )
+
+
+def test_scheduler_default_time_exists_on_spring_forward_day(
+    hass: HomeAssistant,
+) -> None:
+    """Test the default time remains valid across spring-forward."""
+    zone = ZoneInfo("Europe/Ljubljana")
+    now = datetime(2026, 3, 28, 12, 0, tzinfo=zone)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["sun"],
+            CONF_TIMES: DEFAULT_TIMES,
+        },
+    )
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    scheduler = HacsRefreshScheduler(hass, runtime)
+
+    result = scheduler._calculate_next_refresh(now)
+
+    assert result == datetime(2026, 3, 29, 3, 30, tzinfo=zone)
+    assert result is not None
+    assert result.astimezone(UTC) == datetime(2026, 3, 29, 1, 30, tzinfo=UTC)
+
+
+def test_scheduler_returns_second_occurrence_during_fall_back(
+    hass: HomeAssistant,
+) -> None:
+    """Test the second occurrence of an ambiguous time is considered."""
+    zone = ZoneInfo("Europe/Ljubljana")
+    now = datetime(2026, 10, 25, 2, 45, tzinfo=zone, fold=0)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["sun"],
+            CONF_TIMES: ["02:30"],
+        },
+    )
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    scheduler = HacsRefreshScheduler(hass, runtime)
+
+    result = scheduler._calculate_next_refresh(now)
+
+    assert result is not None
+    assert result.fold == 1
+    assert result.astimezone(UTC) == datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
+    assert result.astimezone(UTC) > now.astimezone(UTC)
+
+
+def test_scheduler_next_refresh_across_midnight(
+    hass: HomeAssistant,
+) -> None:
+    """Test the earliest configured time is selected across midnight."""
+    now = datetime(2026, 9, 4, 23, 59, tzinfo=UTC)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_AUTOMATIC_REFRESH: True,
+            CONF_DAYS: ["sat"],
+            CONF_TIMES: ["00:15", "23:30"],
+        },
+    )
+
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    scheduler = HacsRefreshScheduler(hass, runtime)
+
+    result = scheduler._calculate_next_refresh(now)
+
+    assert result == datetime(2026, 9, 5, 0, 15, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(
