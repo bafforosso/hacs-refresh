@@ -226,7 +226,7 @@ async def test_refresh_reports_pending_repositories(
     hass: HomeAssistant,
     hacs: MagicMock,
 ) -> None:
-    """Test that unprocessed repositories are reported as pending."""
+    """Test that late queued work cannot change a finalized result."""
     processed_repository = MagicMock()
     processed_repository.data.full_name = "example/processed-repository"
     processed_repository.update_repository = AsyncMock()
@@ -249,11 +249,13 @@ async def test_refresh_reports_pending_repositories(
     progress_updates: list[HacsRefreshProgress] = []
 
     adapter = HacsAdapter(hass)
+
     result = await adapter.async_refresh(
         progress_callback=progress_updates.append,
     )
 
     pending_task = hacs.queue.add.call_args_list[1].args[0]
+    finalized_progress = list(progress_updates)
 
     assert result == HacsRefreshResult(
         repositories=2,
@@ -265,7 +267,7 @@ async def test_refresh_reports_pending_repositories(
         failures=(),
     )
 
-    assert progress_updates == [
+    assert finalized_progress == [
         HacsRefreshProgress(
             total=2,
             processed=0,
@@ -279,12 +281,19 @@ async def test_refresh_reports_pending_repositories(
             failed=0,
         ),
     ]
-    assert_progress_accounting(progress_updates)
+    assert_progress_accounting(finalized_progress)
 
     assert processed_repository.update_repository.await_count == 1
     pending_repository.update_repository.assert_not_awaited()
 
-    pending_task.close()
+    await pending_task
+
+    assert pending_repository.update_repository.await_count == 1
+    assert progress_updates == finalized_progress
+    assert result.pending == 1
+    assert result.successful == 1
+    assert result.failed == 0
+
     hacs.data.async_write.assert_awaited_once()
 
 

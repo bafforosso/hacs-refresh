@@ -109,6 +109,7 @@ class HacsRefreshRuntimeData:
         self._event_listeners: set[RefreshEventListener] = set()
         self.state = STATE_IDLE
         self.refresh_progress: HacsRefreshProgress | None = None
+        self._active_progress_token: object | None = None
         self.last_completed: datetime | None = None
         self.last_result: str | None = None
         self.last_source: str | None = None
@@ -134,8 +135,13 @@ class HacsRefreshRuntimeData:
     def _async_update_refresh_progress(
         self,
         progress: HacsRefreshProgress,
+        *,
+        token: object,
     ) -> None:
-        """Update the current HACS Refresh progress."""
+        """Update progress only for the active refresh run."""
+        if token is not self._active_progress_token:
+            return
+
         self.refresh_progress = progress
         for listener in tuple(self._progress_listeners):
             listener(progress)
@@ -293,11 +299,28 @@ class HacsRefreshRuntimeData:
             self.notify_listeners()
 
             start = perf_counter()
+            progress_token = object()
+            self._active_progress_token = progress_token
 
-            result = await self.hacs.async_refresh(
-                progress_callback=self._async_update_refresh_progress,
-                repositories=repositories,
-            )
+            @callback
+            def update_refresh_progress(
+                progress: HacsRefreshProgress,
+            ) -> None:
+                """Forward progress for this refresh run only."""
+                self._async_update_refresh_progress(
+                    progress,
+                    token=progress_token,
+                )
+
+            try:
+                result = await self.hacs.async_refresh(
+                    progress_callback=update_refresh_progress,
+                    repositories=repositories,
+                )
+            finally:
+                if self._active_progress_token is progress_token:
+                    self._active_progress_token = None
+
         except asyncio.CancelledError:
             self.state = STATE_IDLE
             raise

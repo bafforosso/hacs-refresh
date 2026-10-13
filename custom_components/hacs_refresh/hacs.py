@@ -159,6 +159,7 @@ class HacsAdapter:
         processed = 0
         successful = 0
         failed = 0
+        run_active = True
 
         def report_progress() -> None:
             """Report the current refresh progress."""
@@ -203,17 +204,19 @@ class HacsAdapter:
                     force=True,
                 )
             except Exception as err:
-                repository_statuses[index] = False
-                failures.append(f"{repository_name}: {err}")
-                failed += 1
-                processed += 1
-                report_progress()
+                if run_active:
+                    repository_statuses[index] = False
+                    failures.append(f"{repository_name}: {err}")
+                    failed += 1
+                    processed += 1
+                    report_progress()
                 raise
             else:
-                repository_statuses[index] = True
-                successful += 1
-                processed += 1
-                report_progress()
+                if run_active:
+                    repository_statuses[index] = True
+                    successful += 1
+                    processed += 1
+                    report_progress()
 
         for index, repository in enumerate(repositories_to_refresh):
             repository_name = getattr(
@@ -235,6 +238,8 @@ class HacsAdapter:
         try:
             await hacs.async_process_queue()
         finally:
+            run_active = False
+
             await hacs.data.async_write()
 
             for coordinator in hacs.coordinators.values():

@@ -20,6 +20,7 @@ from custom_components.hacs_refresh.const import (
     STATE_REFRESHING,
 )
 from custom_components.hacs_refresh.hacs import (
+    HacsAdapter,
     HacsDisabledError,
     HacsInvalidRepositoriesError,
     HacsQueueBusyError,
@@ -209,10 +210,12 @@ def test_runtime_progress_listener_can_be_added_and_removed(
         successful=1,
         failed=0,
     )
+    token = object()
+    runtime._active_progress_token = token
 
     remove_listener = runtime.add_progress_listener(listener)
 
-    runtime._async_update_refresh_progress(progress)
+    runtime._async_update_refresh_progress(progress, token=token)
     listener.assert_called_once_with(progress)
 
     remove_listener()
@@ -223,7 +226,8 @@ def test_runtime_progress_listener_can_be_added_and_removed(
             processed=2,
             successful=2,
             failed=0,
-        )
+        ),
+        token=token,
     )
     listener.assert_called_once_with(progress)
 
@@ -328,10 +332,13 @@ async def test_refresh_succeeds(
     ):
         outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
 
-    mock_refresh.assert_awaited_once_with(
-        progress_callback=runtime._async_update_refresh_progress,
-        repositories=None,
-    )
+    mock_refresh.assert_awaited_once()
+
+    await_args = mock_refresh.await_args
+    assert await_args is not None
+
+    assert callable(await_args.kwargs["progress_callback"])
+    assert await_args.kwargs["repositories"] is None
 
     assert outcome is not None
     assert outcome.repositories == 1
@@ -395,10 +402,13 @@ async def test_refresh_validates_repositories_before_starting(
     mock_validate.assert_called_once_with(
         ("example/valid-repository",),
     )
-    mock_refresh.assert_awaited_once_with(
-        progress_callback=runtime._async_update_refresh_progress,
-        repositories=("example/valid-repository",),
-    )
+    mock_refresh.assert_awaited_once()
+
+    await_args = mock_refresh.await_args
+    assert await_args is not None
+
+    assert callable(await_args.kwargs["progress_callback"])
+    assert await_args.kwargs["repositories"] == ("example/valid-repository",)
 
 
 async def test_refresh_does_not_start_when_repository_validation_fails(
@@ -520,6 +530,77 @@ async def test_refresh_tracks_progress(
 
     # Progress updates must not notify the existing runtime listeners.
     assert runtime_states == [STATE_REFRESHING, STATE_IDLE]
+
+
+async def test_late_progress_callback_from_previous_run_is_ignored(
+    hass: HomeAssistant,
+) -> None:
+    """Test that an earlier run cannot overwrite current progress."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+
+    first_progress = HacsRefreshProgress(
+        total=2,
+        processed=1,
+        successful=1,
+        failed=0,
+    )
+    second_progress = HacsRefreshProgress(
+        total=3,
+        processed=2,
+        successful=2,
+        failed=0,
+    )
+
+    callbacks: list[Callable[[HacsRefreshProgress], None]] = []
+    second_run_started = asyncio.Event()
+    finish_second_run = asyncio.Event()
+
+    async def async_refresh(
+        *,
+        progress_callback: Callable[[HacsRefreshProgress], None],
+        repositories: tuple[str, ...] | None,
+    ) -> HacsRefreshResult:
+        callbacks.append(progress_callback)
+
+        if len(callbacks) == 1:
+            progress_callback(first_progress)
+            return _refresh_result(
+                repositories=2,
+                successful=2,
+            )
+
+        progress_callback(second_progress)
+        second_run_started.set()
+        await finish_second_run.wait()
+        return _refresh_result(
+            repositories=3,
+            successful=3,
+        )
+
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new=async_refresh,
+    ):
+        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+        second_run = asyncio.create_task(
+            runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        )
+        await second_run_started.wait()
+
+        assert runtime.refresh_progress == second_progress
+
+        callbacks[0](first_progress)
+
+        assert runtime.refresh_progress == second_progress
+
+        finish_second_run.set()
+        await second_run
+
+    assert runtime.refresh_progress is None
+    assert runtime.state == STATE_IDLE
 
 
 async def test_refresh_notifies_runtime_listeners_after_lock_is_released(
@@ -1400,42 +1481,98 @@ async def test_refresh_succeeds_with_no_repositories(
     mock_refresh.assert_awaited_once()
 
 
+@pytest.mark.parametrize(
+    "late_failure",
+    [False, True],
+    ids=["late-success", "late-failure"],
+)
 async def test_refresh_reports_pending_repositories(
     hass: HomeAssistant,
+    hacs: MagicMock,
+    late_failure: bool,
 ) -> None:
-    """Test that pending repository refreshes are reported correctly."""
-    entry = MockConfigEntry(domain=DOMAIN)
-    runtime = HacsRefreshRuntimeData(hass, entry)
+    """Test that late queued work cannot change a finalized result."""
+    processed_repository = MagicMock()
+    processed_repository.data.full_name = "example/processed-repository"
+    processed_repository.update_repository = AsyncMock()
 
-    with (
-        patch.object(
-            runtime.hacs,
-            "async_refresh",
-            new_callable=AsyncMock,
-            return_value=_refresh_result(
-                repositories=1,
-                successful=1,
-                pending=1,
-            ),
+    pending_repository = MagicMock()
+    pending_repository.data.full_name = "example/pending-repository"
+    pending_repository.update_repository = AsyncMock(
+        side_effect=(RuntimeError("late failure") if late_failure else None)
+    )
+
+    hacs.repositories.list_downloaded = [
+        processed_repository,
+        pending_repository,
+    ]
+    hass.data["hacs"] = hacs
+
+    async def process_queue() -> None:
+        await hacs.queue.add.call_args_list[0].args[0]
+
+    hacs.async_process_queue = AsyncMock(side_effect=process_queue)
+
+    progress_updates: list[HacsRefreshProgress] = []
+    adapter = HacsAdapter(hass)
+
+    result = await adapter.async_refresh(
+        progress_callback=progress_updates.append,
+    )
+
+    pending_task = hacs.queue.add.call_args_list[1].args[0]
+    finalized_progress = list(progress_updates)
+
+    assert result == HacsRefreshResult(
+        repositories=2,
+        successful=1,
+        failed=0,
+        pending=1,
+        failed_repositories=(),
+        pending_repositories=("example/pending-repository",),
+        failures=(),
+    )
+
+    assert finalized_progress == [
+        HacsRefreshProgress(
+            total=2,
+            processed=0,
+            successful=0,
+            failed=0,
         ),
-        pytest.raises(HomeAssistantError) as exc_info,
-    ):
-        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        HacsRefreshProgress(
+            total=2,
+            processed=1,
+            successful=1,
+            failed=0,
+        ),
+    ]
+    for progress in finalized_progress:
+        assert progress.processed == progress.successful + progress.failed
+        assert progress.processed <= progress.total
 
-    assert exc_info.value.translation_domain == DOMAIN
-    assert exc_info.value.translation_key == "refresh_tasks_pending"
-    assert exc_info.value.translation_placeholders == {
-        "pending": "1",
-    }
+    processed_repository.update_repository.assert_awaited_once_with(
+        ignore_issues=True,
+        force=True,
+    )
+    pending_repository.update_repository.assert_not_awaited()
 
-    assert runtime.state == STATE_IDLE
-    assert runtime.last_result == EVENT_TYPE_PARTIAL
-    assert runtime.last_source == REFRESH_SOURCE_MANUAL
-    assert runtime.last_repositories == 1
-    assert runtime.last_successful == 1
-    assert runtime.last_failed == 0
-    assert runtime.last_pending == 1
-    assert runtime.last_message == "1 repository refresh task(s) remain pending"
+    if late_failure:
+        with pytest.raises(RuntimeError, match="late failure"):
+            await pending_task
+    else:
+        await pending_task
+
+    pending_repository.update_repository.assert_awaited_once_with(
+        ignore_issues=True,
+        force=True,
+    )
+    assert progress_updates == finalized_progress
+    assert result.pending == 1
+    assert result.successful == 1
+    assert result.failed == 0
+
+    hacs.data.async_write.assert_awaited_once()
 
 
 async def test_refresh_reports_repository_failure(
