@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.hacs_refresh.button import (
@@ -100,5 +101,24 @@ async def test_refresh_button_triggers_manual_refresh() -> None:
     button = HacsRefreshButton(runtime)
 
     await button.async_press()
+
+    runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)
+
+
+async def test_refresh_button_propagates_execution_failure() -> None:
+    """Test that genuine runtime execution failures propagate from the button."""
+    runtime = MagicMock()
+    runtime.entry.entry_id = "test-entry"
+    runtime.async_refresh = AsyncMock(
+        side_effect=RuntimeError("Unexpected refresh execution failure")
+    )
+
+    button = HacsRefreshButton(runtime)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Unexpected refresh execution failure",
+    ):
+        await button.async_press()
 
     runtime.async_refresh.assert_awaited_once_with(source=REFRESH_SOURCE_MANUAL)

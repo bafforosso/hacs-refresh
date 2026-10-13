@@ -1004,7 +1004,7 @@ async def test_refresh_preserves_cancellation_when_persistence_fails(
 async def test_refresh_outcome_is_propagated_to_event(
     hass: HomeAssistant,
 ) -> None:
-    """Test that the refresh outcome is included in the completion event."""
+    """Test that the completed refresh outcome is returned and emitted."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
@@ -1018,6 +1018,7 @@ async def test_refresh_outcome_is_propagated_to_event(
         failed_repositories=("example/failed-repository",),
         pending_repositories=("example/pending-repository",),
     )
+
     with (
         patch.object(
             runtime.hacs,
@@ -1029,27 +1030,41 @@ async def test_refresh_outcome_is_propagated_to_event(
             "custom_components.hacs_refresh.runtime.perf_counter",
             side_effect=[10.0, 12.5],
         ),
-        pytest.raises(HomeAssistantError),
     ):
-        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+    assert outcome is not None
+    assert outcome == HacsRefreshOutcome(
+        repositories=4,
+        successful=2,
+        failed=1,
+        pending=1,
+        failed_repositories=("example/failed-repository",),
+        pending_repositories=("example/pending-repository",),
+        duration=2.5,
+    )
 
     listener.assert_called_once()
-    event_data = listener.call_args.args[1]
+    event_type, event_data = listener.call_args.args
+    assert event_type == EVENT_TYPE_PARTIAL
     assert event_data == {
         "source": REFRESH_SOURCE_MANUAL,
         "repositories": 4,
         "successful": 2,
         "failed": 1,
         "pending": 1,
-        "failed_repositories": [
-            "example/failed-repository",
-        ],
-        "pending_repositories": [
-            "example/pending-repository",
-        ],
+        "failed_repositories": ["example/failed-repository"],
+        "pending_repositories": ["example/pending-repository"],
         "duration": 2.5,
         "message": "1 repository refresh task(s) remain pending",
     }
+
+    assert runtime.last_result == EVENT_TYPE_PARTIAL
+    assert runtime.last_repositories == outcome.repositories
+    assert runtime.last_successful == outcome.successful
+    assert runtime.last_failed == outcome.failed
+    assert runtime.last_pending == outcome.pending
+    assert runtime.last_duration == outcome.duration
 
 
 @pytest.mark.parametrize(
@@ -1084,26 +1099,30 @@ async def test_refresh_result_message_is_propagated_to_event(
     event_type: str,
     message: str,
 ) -> None:
-    """Test that partial and failed refresh messages are included in the event."""
+    """Test that completed partial and failed results are returned and emitted."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
     listener = MagicMock()
     runtime.add_event_listener(listener)
 
-    with (
-        patch.object(
-            runtime.hacs,
-            "async_refresh",
-            new_callable=AsyncMock,
-            return_value=refresh_result,
-        ),
-        pytest.raises(HomeAssistantError),
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        return_value=refresh_result,
     ):
-        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+
+    assert outcome is not None
+    assert outcome.failed == refresh_result.failed
+    assert outcome.pending == refresh_result.pending
 
     listener.assert_called_once()
     assert listener.call_args.args[0] == event_type
     assert listener.call_args.args[1]["message"] == message
+
+    assert runtime.last_result == event_type
+    assert runtime.last_message == message
 
 
 def test_runtime_event_listener_can_be_added_and_removed(
@@ -1519,11 +1538,11 @@ async def test_scheduled_refresh_is_skipped_when_queue_is_busy(
     )
 
 
-async def test_scheduled_refresh_suppresses_refresh_error(
+async def test_scheduled_refresh_logs_pending_repositories(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that scheduled refresh errors are logged instead of raised."""
+    """Test that scheduled refreshes log when repositories remain pending."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
@@ -1543,7 +1562,9 @@ async def test_scheduled_refresh_suppresses_refresh_error(
     assert runtime.last_result == EVENT_TYPE_PARTIAL
     assert runtime.last_source == REFRESH_SOURCE_SCHEDULED
     assert runtime.last_pending == 1
-    assert "Scheduled HACS refresh failed" in caplog.text
+    assert (
+        "HACS refresh finished with 1 repositories still pending in the HACS queue"
+    ) in caplog.text
 
 
 async def test_scheduled_refresh_is_skipped_within_minimum_interval(
@@ -1841,38 +1862,52 @@ async def test_refresh_reports_pending_repositories(
 async def test_refresh_reports_repository_failure(
     hass: HomeAssistant,
 ) -> None:
-    """Test that repository refresh failures are reported correctly."""
+    """Test that completed repository failures are returned, recorded, and persisted."""
     entry = MockConfigEntry(domain=DOMAIN)
     runtime = HacsRefreshRuntimeData(hass, entry)
 
-    with (
-        patch.object(
-            runtime.hacs,
-            "async_refresh",
-            new_callable=AsyncMock,
-            return_value=_refresh_result(
-                repositories=2,
-                successful=1,
-                failed=1,
-                failures=("example/failed-repository: Something went wrong",),
-            ),
+    with patch.object(
+        runtime.hacs,
+        "async_refresh",
+        new_callable=AsyncMock,
+        return_value=_refresh_result(
+            repositories=2,
+            successful=1,
+            failed=1,
+            failed_repositories=("example/failed-repository",),
+            failures=("example/failed-repository: Something went wrong",),
         ),
-        pytest.raises(HomeAssistantError) as exc_info,
     ):
-        await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
+        outcome = await runtime.async_refresh(source=REFRESH_SOURCE_MANUAL)
 
-    assert exc_info.value.translation_domain == DOMAIN
-    assert exc_info.value.translation_key == "refresh_tasks_failed"
-    assert exc_info.value.translation_placeholders == {
-        "failed": "1",
-        "repositories": "2",
-    }
+    assert outcome is not None
+    assert outcome.repositories == 2
+    assert outcome.successful == 1
+    assert outcome.failed == 1
+    assert outcome.pending == 0
+    assert outcome.failed_repositories == ("example/failed-repository",)
+    assert outcome.pending_repositories == ()
 
     assert runtime.state == STATE_IDLE
     assert runtime.last_result == EVENT_TYPE_FAILED
     assert runtime.last_source == REFRESH_SOURCE_MANUAL
-    assert runtime.last_repositories == 2
-    assert runtime.last_successful == 1
-    assert runtime.last_failed == 1
-    assert runtime.last_pending == 0
+    assert runtime.last_repositories == outcome.repositories
+    assert runtime.last_successful == outcome.successful
+    assert runtime.last_failed == outcome.failed
+    assert runtime.last_pending == outcome.pending
+    assert runtime.last_duration == outcome.duration
     assert runtime.last_message == "1 repository refresh task(s) failed"
+    assert runtime.last_completed is not None
+
+    stored = await runtime._store.async_load()
+
+    assert stored is not None
+    assert stored["completed"] == runtime.last_completed.isoformat()
+    assert stored["result"] == EVENT_TYPE_FAILED
+    assert stored["source"] == REFRESH_SOURCE_MANUAL
+    assert stored["message"] == runtime.last_message
+    assert stored["duration"] == outcome.duration
+    assert stored["repositories"] == outcome.repositories
+    assert stored["successful"] == outcome.successful
+    assert stored["failed"] == outcome.failed
+    assert stored["pending"] == outcome.pending

@@ -507,12 +507,6 @@ class HacsRefreshRuntimeData:
                 outcome.pending,
             )
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="refresh_tasks_pending",
-                translation_placeholders={"pending": str(outcome.pending)},
-            )
-
         if outcome.failed:
             _LOGGER.error(
                 "HACS refresh failed for %d of %d repositories",
@@ -526,18 +520,11 @@ class HacsRefreshRuntimeData:
                     failure,
                 )
 
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="refresh_tasks_failed",
-                translation_placeholders={
-                    "failed": str(outcome.failed),
-                    "repositories": str(outcome.repositories),
-                },
+        if not outcome.pending and not outcome.failed:
+            _LOGGER.debug(
+                "HACS refresh completed without reported repository failures "
+                "for %d repositories",
+                outcome.repositories,
             )
 
-        _LOGGER.debug(
-            "HACS refresh completed without reported repository failures "
-            "for %d repositories",
-            outcome.repositories,
-        )
         return outcome
