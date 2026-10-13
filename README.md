@@ -104,11 +104,11 @@ The response `data` contains:
 | Field | Type | Description |
 | --- | :---: | --- |
 | `repositories` | `int` | Total number of repositories included in the refresh. |
-| `successful` | `int` | Number of repositories refreshed successfully. |
-| `failed` | `int` | Number of repositories that failed to refresh. |
+| `successful` | `int` | Number of repository update calls that returned without raising an exception. This does not guarantee that all underlying GitHub/API requests succeeded. |
+| `failed` | `int` | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Number of repositories that were not processed. |
-| `failed_repositories` | `list[str]` | Full names of repositories that failed to refresh. |
-| `pending_repositories` | `list[str]` | Full names of repositories that were not processed. |
+| `failed_repositories` | `list[str]` | Full names of repositories whose update calls raised an exception reaching HACS Refresh. |
+| `pending_repositories` | `list[str]` | Full names of repositories whose queued update tasks had not executed when the refresh result was finalized. |
 | `duration` | `float` | Refresh duration in seconds. |
 
 > [!WARNING]
@@ -187,9 +187,11 @@ The refresh result is reported by `event_type`:
 
 | Event type | Description |
 | --- | --- |
-| `success` | The refresh completed successfully for all repositories included in the refresh. |
-| `partial` | The refresh completed with one or more repositories still pending. |
-| `failed` | The refresh completed with one or more repositories failing to refresh. |
+| `success` | All repository update calls returned without raising an exception, and no repositories remained pending. This does not guarantee that every underlying GitHub/API request succeeded, because HACS may handle some failures internally. |
+| `partial` | One or more repository update tasks remained pending when the refresh result was finalized. The result may also include repository failures. |
+| `failed` | One or more repository update calls raised an exception reaching HACS Refresh, and no repositories remained pending. |
+
+> **Result limitations:** HACS Refresh reports outcomes observable through the HACS repository update interface. HACS may handle some underlying GitHub/API failures internally without propagating an exception. Consequently, a `success` event means that no repository update call reported an exception and no repositories remained pending; it is not proof that every GitHub request succeeded.
 
 Its `attributes` provide further details about the refresh:
 
@@ -198,11 +200,11 @@ Its `attributes` provide further details about the refresh:
 | `source` | `str` | Always | `scheduled`, `manual` | What triggered the refresh. |
 | `duration` | `float` | Always | Seconds | Duration of the completed refresh. |
 | `repositories` | `int` | Always | ≥ 0 | Total number of repositories included in the refresh. |
-| `successful` | `int` | Always | ≥ 0 | Number of repositories refreshed successfully. |
-| `failed` | `int` | Always | ≥ 0 | Number of repositories that failed to refresh. |
+| `successful` | `int` | Always | ≥ 0 | Number of repository update calls that returned without raising an exception. This does not guarantee that all underlying GitHub/API requests succeeded. |
+| `failed` | `int` | Always | ≥ 0 | Number of repository update calls that raised an exception reaching HACS Refresh. |
 | `pending` | `int` | Always | ≥ 0 | Number of repositories that remain pending. |
-| `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories that failed to refresh. Included only when one or more repositories failed. |
-| `pending_repositories` | `list[str]` | Conditional | Repository full names | Repositories that were not processed. Included only when one or more repositories remain pending. |
+| `failed_repositories` | `list[str]` | Conditional | Repository full names | Repositories whose update calls raised an exception reaching HACS Refresh. Included only when one or more repositories failed. |
+| `pending_repositories` | `list[str]` | Conditional | Repository full names | Repositories whose queued update tasks had not executed when the refresh result was finalized. Included only when one or more repositories remain pending. |
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.

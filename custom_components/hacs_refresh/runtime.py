@@ -487,7 +487,8 @@ class HacsRefreshRuntimeData:
             )
 
         _LOGGER.debug(
-            "HACS forced refresh completed successfully for %d repositories",
+            "HACS refresh completed without reported repository failures "
+            "for %d repositories",
             outcome.repositories,
         )
         return outcome

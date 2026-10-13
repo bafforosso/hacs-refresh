@@ -32,7 +32,17 @@ class HacsInvalidRepositoriesError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class HacsRefreshResult:
-    """Result of a HACS repository refresh."""
+    """Observed outcome of a HACS repository refresh.
+
+    A repository is counted as successful when its
+    update_repository() call returns without raising an exception.
+    HACS may suppress underlying GitHub/API failures, so a successful
+    call does not guarantee that every underlying request succeeded.
+
+    A repository is counted as failed when its update_repository()
+    call raises an exception that reaches this adapter. Repositories
+    whose queued tasks have not executed are counted as pending.
+    """
 
     repositories: int
     successful: int
@@ -45,7 +55,12 @@ class HacsRefreshResult:
 
 @dataclass(frozen=True, slots=True)
 class HacsRefreshProgress:
-    """Progress of a HACS repository refresh."""
+    """Progress based on outcomes observable by the HACS adapter.
+
+    Successful and failed counts follow the same exception-based
+    semantics as HacsRefreshResult. They do not independently
+    establish whether every underlying GitHub/API request succeeded.
+    """
 
     total: int
     processed: int
