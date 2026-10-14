@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryError,
@@ -42,7 +43,13 @@ from custom_components.hacs_refresh.switch import (
 
 def test_platforms() -> None:
     """Test the integration platforms."""
-    assert PLATFORMS == ["button", "event", "sensor", "switch"]
+    assert PLATFORMS == [
+        Platform.BUTTON,
+        Platform.EVENT,
+        Platform.SENSOR,
+        Platform.SWITCH,
+    ]
+    assert all(isinstance(platform, Platform) for platform in PLATFORMS)
 
 
 async def test_service_is_registered(hass: HomeAssistant) -> None:
