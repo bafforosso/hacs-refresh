@@ -50,9 +50,21 @@ jobs:
         run: uv run --locked pytest --cov=. --cov-report=term-missing
 
       - name: Check integration module coverage
+        shell: bash
         run: |
-          for module in custom_components/hacs_refresh/*.py; do
+          mapfile -d '' modules < <(
+            find custom_components/hacs_refresh -type f -name '*.py' -print0
+          )
+
+          if (( ${#modules[@]} == 0 )); then
+            echo "::error::No Python modules found under custom_components/hacs_refresh"
+            exit 1
+          fi
+
+          for module in "${modules[@]}"; do
+            echo "::group::Coverage: ${module}"
             uv run --locked coverage report "$module"
+            echo "::endgroup::"
           done
 
       - name: Check config flow coverage
