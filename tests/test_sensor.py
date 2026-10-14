@@ -1,11 +1,14 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
 from custom_components.hacs_refresh.const import (
     PROGRESS_SENSOR_UNIQUE_ID,
+    STATE_IDLE,
+    STATE_REFRESHING,
     STATUS_SENSOR_UNIQUE_ID,
 )
 from custom_components.hacs_refresh.hacs import HacsRefreshProgress
@@ -16,19 +19,34 @@ from custom_components.hacs_refresh.sensor import (
 )
 
 
-def test_status_sensor_initializes() -> None:
+@pytest.mark.parametrize(
+    "status",
+    [STATE_IDLE, STATE_REFRESHING],
+)
+def test_status_sensor_initializes(
+    status: str,
+) -> None:
     """Test that the status sensor initializes correctly."""
     runtime = MagicMock()
     runtime.entry.entry_id = "test-entry"
-    runtime.state = "idle"
+    runtime.state = status
 
     sensor = HacsRefreshStatusSensor(runtime)
 
     assert sensor.runtime is runtime
-    assert sensor.native_value == "idle"
+    assert sensor.native_value == status
     assert sensor.unique_id == STATUS_SENSOR_UNIQUE_ID
     assert sensor._attr_translation_key == "status"
     assert sensor.entity_category is None
+    assert sensor.device_class == SensorDeviceClass.ENUM
+
+    options = sensor.options
+    assert options is not None
+    assert options == [STATE_IDLE, STATE_REFRESHING]
+    assert status in options
+
+    assert sensor.native_unit_of_measurement is None
+    assert sensor.state_class is None
     runtime.add_listener.assert_not_called()
 
 
