@@ -25,6 +25,7 @@ jobs:
           zip "$GITHUB_WORKSPACE/hacs_refresh.zip" -r ./
 
       - name: Upload release ZIP
-        run: gh release upload "${{ github.event.release.tag_name }}" "$GITHUB_WORKSPACE/hacs_refresh.zip"
+        run: gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE/hacs_refresh.zip"
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
