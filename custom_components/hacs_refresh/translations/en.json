@@ -141,7 +141,7 @@
       "fields": {
         "repositories": {
           "name": "Repositories",
-          "description": "Optional list of installed HACS repositories to refresh. Use full names in the format `owner/repository`."
+          "description": "Optionally specify a repository name or a list of installed HACS repositories to refresh. Use full names in the format `owner/repository`."
         }
       }
     }

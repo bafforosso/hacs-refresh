@@ -39,7 +39,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SERVICE_REFRESH_SCHEMA = vol.Schema(
     {
-        vol.Optional("repositories"): [cv.string],
+        vol.Optional("repositories"): vol.All(
+            cv.ensure_list,
+            [cv.string],
+        ),
     }
 )
 

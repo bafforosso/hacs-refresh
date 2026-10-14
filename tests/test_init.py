@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryError,
@@ -317,6 +318,63 @@ async def test_refresh_service_rejects_empty_repository_list(
 
     assert err.value.translation_key == "repositories_empty"
     runtime.async_refresh.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "invalid_member",
+    [
+        None,
+        {},
+        [],
+    ],
+    ids=["none", "dictionary", "nested-list"],
+)
+async def test_refresh_service_rejects_invalid_repository_members(
+    hass: HomeAssistant,
+    invalid_member: Any,
+) -> None:
+    """Test that invalid repository list members are rejected by the schema."""
+    await async_setup(hass, {})
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": ["example/valid-repository", invalid_member]},
+            blocking=True,
+        )
+
+
+async def test_refresh_service_passes_single_repository(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a single repository string is passed as a one-item tuple."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock()
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    repository = "example/single-repository"
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[entry],
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": repository},
+            blocking=True,
+        )
+
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=(repository,),
+    )
 
 
 async def test_refresh_service_passes_selected_repositories(

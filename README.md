@@ -90,7 +90,14 @@ A manual refresh can be triggered using the **Refresh** button. It refreshes all
 
 ### Refresh Action
 
-The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. If `repositories` is omitted, all installed HACS repositories are refreshed. To refresh only specific repositories, provide their full HACS names in the `owner/repository` format.
+The `hacs_refresh.refresh` action can be used from automations, scripts, or other Home Assistant actions. If `repositories` is omitted, all installed HACS repositories are refreshed. To refresh specific repositories, provide either a single repository name or a list of full HACS repository names in the `owner/repository` format.
+
+```yaml
+action: hacs_refresh.refresh
+data:
+  repositories: user/repository
+response_variable: refresh_result
+```
 
 ```yaml
 action: hacs_refresh.refresh
