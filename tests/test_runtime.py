@@ -178,6 +178,68 @@ async def test_runtime_ignores_invalid_last_completed_timestamp(
     assert runtime.last_pending == 0
 
 
+def test_runtime_starts_hacs_availability_monitor(
+    hass: HomeAssistant,
+) -> None:
+    """Test that the runtime registers its availability monitor."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    unsubscribe = MagicMock()
+
+    with patch(
+        "custom_components.hacs_refresh.runtime.async_track_time_interval",
+        return_value=unsubscribe,
+    ) as mock_track_interval:
+        assert runtime.start_hacs_availability_monitor() is unsubscribe
+
+    mock_track_interval.assert_called_once_with(
+        hass,
+        runtime._async_check_hacs_availability,
+        timedelta(seconds=30),
+    )
+
+
+def test_runtime_notifies_entities_when_hacs_availability_changes(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that availability transitions notify runtime listeners."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    runtime = HacsRefreshRuntimeData(hass, entry)
+    listener = MagicMock()
+    runtime.add_listener(listener)
+
+    # No HACS and no state transition.
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    listener.assert_not_called()
+
+    # HACS becomes available.
+    hass.data["hacs"] = hacs
+    hacs.system.disabled = False
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    listener.assert_called_once_with()
+
+    # Repeated checks do not notify again.
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    listener.assert_called_once_with()
+
+    # HACS becomes disabled.
+    hacs.system.disabled = True
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    assert listener.call_count == 2
+
+    # Removing HACS while already unavailable is not a new transition.
+    hass.data.pop("hacs")
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    assert listener.call_count == 2
+
+    # HACS returns and becomes available again.
+    hass.data["hacs"] = hacs
+    hacs.system.disabled = False
+    runtime._async_check_hacs_availability(datetime.now(UTC))
+    assert listener.call_count == 3
+
+
 def test_runtime_listener_can_be_added_and_removed(
     hass: HomeAssistant,
 ) -> None:

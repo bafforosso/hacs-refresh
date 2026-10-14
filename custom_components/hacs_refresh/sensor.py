@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     PROGRESS_SENSOR_UNIQUE_ID,
+    STATE_IDLE,
+    STATE_REFRESHING,
     STATUS_SENSOR_UNIQUE_ID,
 )
 from .entity import HacsRefreshEntity
@@ -39,24 +41,16 @@ class HacsRefreshStatusSensor(
 ):
     """Represent HACS Refresh status."""
 
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [STATE_IDLE, STATE_REFRESHING]  # noqa: RUF012
     _attr_translation_key = "status"
     _attr_should_poll = False
     _attr_unique_id = STATUS_SENSOR_UNIQUE_ID
-
-    async def async_added_to_hass(self) -> None:
-        """Register the runtime listener."""
-        await super().async_added_to_hass()
-        self.async_on_remove(self.runtime.add_listener(self._async_runtime_updated))
 
     @property
     def native_value(self) -> str:
         """Return the current status."""
         return self.runtime.state
-
-    @callback
-    def _async_runtime_updated(self) -> None:
-        """Update the sensor."""
-        self.async_write_ha_state()
 
 
 class HacsRefreshProgressSensor(

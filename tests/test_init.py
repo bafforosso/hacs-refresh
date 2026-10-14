@@ -1,10 +1,12 @@
 import asyncio
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryError,
@@ -41,7 +43,13 @@ from custom_components.hacs_refresh.switch import (
 
 def test_platforms() -> None:
     """Test the integration platforms."""
-    assert PLATFORMS == ["button", "event", "sensor", "switch"]
+    assert PLATFORMS == [
+        Platform.BUTTON,
+        Platform.EVENT,
+        Platform.SENSOR,
+        Platform.SWITCH,
+    ]
+    assert all(isinstance(platform, Platform) for platform in PLATFORMS)
 
 
 async def test_service_is_registered(hass: HomeAssistant) -> None:
@@ -319,6 +327,63 @@ async def test_refresh_service_rejects_empty_repository_list(
     runtime.async_refresh.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "invalid_member",
+    [
+        None,
+        {},
+        [],
+    ],
+    ids=["none", "dictionary", "nested-list"],
+)
+async def test_refresh_service_rejects_invalid_repository_members(
+    hass: HomeAssistant,
+    invalid_member: Any,
+) -> None:
+    """Test that invalid repository list members are rejected by the schema."""
+    await async_setup(hass, {})
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": ["example/valid-repository", invalid_member]},
+            blocking=True,
+        )
+
+
+async def test_refresh_service_passes_single_repository(
+    hass: HomeAssistant,
+) -> None:
+    """Test that a single repository string is passed as a one-item tuple."""
+    await async_setup(hass, {})
+
+    runtime = MagicMock()
+    runtime.async_refresh = AsyncMock()
+
+    entry = MagicMock()
+    entry.runtime_data = runtime
+
+    repository = "example/single-repository"
+
+    with patch.object(
+        hass.config_entries,
+        "async_loaded_entries",
+        return_value=[entry],
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_REFRESH,
+            {"repositories": repository},
+            blocking=True,
+        )
+
+    runtime.async_refresh.assert_awaited_once_with(
+        source=REFRESH_SOURCE_MANUAL,
+        repositories=(repository,),
+    )
+
+
 async def test_refresh_service_passes_selected_repositories(
     hass: HomeAssistant,
 ) -> None:
@@ -511,6 +576,11 @@ async def test_setup_entry_initializes_integration(
     """Test that setup initializes runtime, scheduler, and platforms."""
     config_entry = MockConfigEntry(domain=DOMAIN)
 
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.async_track_time_interval",
+        MagicMock(return_value=MagicMock()),
+    )
+
     hass.data["hacs"] = MagicMock()
 
     forward_entry_setups = AsyncMock()
@@ -556,6 +626,11 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
 ) -> None:
     """Test that option updates reconfigure the scheduler and notify listeners."""
     config_entry = MockConfigEntry(domain=DOMAIN)
+
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.async_track_time_interval",
+        MagicMock(return_value=MagicMock()),
+    )
 
     hass.data["hacs"] = MagicMock()
 
@@ -608,6 +683,11 @@ async def test_switch_option_update_reconfigures_scheduler(
     )
     config_entry.add_to_hass(hass)
 
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.runtime.async_track_time_interval",
+        MagicMock(return_value=MagicMock()),
+    )
+
     hass.data["hacs"] = MagicMock()
 
     forward_entry_setups = AsyncMock()
@@ -650,13 +730,13 @@ async def test_switch_option_update_reconfigures_scheduler(
         mock_notify_listeners.assert_called_once_with()
 
 
-async def test_unload_entry_cancels_scheduled_refresh(
+async def test_unload_entry_cancels_scheduled_refresh_and_availability_monitor(
     hass: HomeAssistant,
     enable_custom_integrations: None,
     mock_hacs_integration: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that unloading the entry cancels a scheduled refresh."""
+    """Test that unloading cancels scheduled refresh and availability monitor."""
     config_entry = MockConfigEntry(
         domain=DOMAIN,
         options={
@@ -676,6 +756,7 @@ async def test_unload_entry_cancels_scheduled_refresh(
     refresh_started = asyncio.Event()
     refresh_cancelled = asyncio.Event()
     scheduled_callback: Callable[[datetime], Any] | None = None
+    availability_unsubscribe = MagicMock()
 
     async def async_refresh(
         *,
@@ -703,9 +784,20 @@ async def test_unload_entry_cancels_scheduled_refresh(
 
     hass.data["hacs"] = MagicMock()
 
-    with patch(
-        "custom_components.hacs_refresh.scheduler.async_track_time_change",
-        side_effect=capture_callback,
+    with (
+        patch(
+            "custom_components.hacs_refresh.scheduler.async_track_time_change",
+            side_effect=capture_callback,
+        ),
+        patch(
+            "custom_components.hacs_refresh.runtime.async_track_time_interval",
+            return_value=availability_unsubscribe,
+        ) as mock_track_interval,
+        patch.object(
+            config_entry,
+            "async_on_unload",
+            wraps=config_entry.async_on_unload,
+        ) as mock_async_on_unload,
     ):
         assert await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
@@ -713,6 +805,13 @@ async def test_unload_entry_cancels_scheduled_refresh(
         assert scheduled_callback is not None
 
         runtime = config_entry.runtime_data
+
+        mock_track_interval.assert_called_once_with(
+            hass,
+            runtime._async_check_hacs_availability,
+            timedelta(seconds=30),
+        )
+        mock_async_on_unload.assert_any_call(availability_unsubscribe)
 
         with patch.object(runtime.hacs, "async_refresh", new=async_refresh):
             scheduled_callback(
@@ -728,6 +827,7 @@ async def test_unload_entry_cancels_scheduled_refresh(
 
     assert refresh_cancelled.is_set()
     assert runtime.refresh_in_progress is False
+    availability_unsubscribe.assert_called_once_with()
 
 
 async def test_unload_entry_unloads_platforms(

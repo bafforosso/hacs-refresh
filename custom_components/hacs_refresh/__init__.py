@@ -7,6 +7,7 @@ from typing import Any
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.const import __version__ as HAVERSION
 from homeassistant.core import (
     HomeAssistant,
@@ -31,7 +32,12 @@ from .hacs import HacsInvalidRepositoriesError
 from .runtime import HacsRefreshRuntimeData
 from .scheduler import HacsRefreshScheduler
 
-PLATFORMS = ["button", "event", "sensor", "switch"]
+PLATFORMS = [
+    Platform.BUTTON,
+    Platform.EVENT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 type HacsRefreshConfigEntry = ConfigEntry[HacsRefreshRuntimeData]
 
@@ -39,7 +45,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SERVICE_REFRESH_SCHEMA = vol.Schema(
     {
-        vol.Optional("repositories"): [cv.string],
+        vol.Optional("repositories"): vol.All(
+            cv.ensure_list,
+            [cv.string],
+        ),
     }
 )
 
@@ -158,6 +167,8 @@ async def async_setup_entry(
         entry,
         PLATFORMS,
     )
+
+    entry.async_on_unload(runtime.start_hacs_availability_monitor())
 
     return True
 

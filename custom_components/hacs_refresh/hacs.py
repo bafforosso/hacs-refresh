@@ -83,6 +83,12 @@ class HacsAdapter:
         """Initialize the HACS adapter."""
         self.hass = hass
 
+    @property
+    def available(self) -> bool:
+        """Return whether HACS is present and enabled."""
+        hacs = self.hass.data.get("hacs")
+        return hacs is not None and not hacs.system.disabled
+
     def _get_hacs(self) -> Any:
         """Return the HACS instance."""
         hacs = self.hass.data.get("hacs")

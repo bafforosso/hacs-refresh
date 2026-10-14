@@ -141,7 +141,7 @@
       "fields": {
         "repositories": {
           "name": "Dépôts",
-          "description": "Liste facultative des dépôts HACS installés à actualiser. Utilisez leur nom complet au format `owner/repository`."
+          "description": "(Facultatif) Indiquez un dépôt HACS installé ou une liste de dépôts à actualiser. Utilisez le nom complet au format `owner/repository`."
         }
       }
     }

@@ -90,3 +90,7 @@ async def test_refresh_completed_event_registers_listener(
     runtime.add_event_listener.assert_called_once_with(
         event._async_refresh_completed,
     )
+
+    runtime.add_listener.assert_called_once_with(
+        event._async_runtime_updated,
+    )

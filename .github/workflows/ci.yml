@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -50,9 +50,21 @@ jobs:
         run: uv run --locked pytest --cov=. --cov-report=term-missing
 
       - name: Check integration module coverage
+        shell: bash
         run: |
-          for module in custom_components/hacs_refresh/*.py; do
-            uv run --locked coverage report "$module"
+          mapfile -d '' modules < <(
+            find custom_components/hacs_refresh -type f -name '*.py' -print0
+          )
+
+          if (( ${#modules[@]} == 0 )); then
+            echo "::error::No Python modules found under custom_components/hacs_refresh"
+            exit 1
+          fi
+
+          for module in "${modules[@]}"; do
+            echo "::group::Coverage: ${module}"
+            uv run --locked coverage report --fail-under=95.01 "$module"
+            echo "::endgroup::"
           done
 
       - name: Check config flow coverage
@@ -65,7 +77,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
