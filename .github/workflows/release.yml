@@ -19,6 +19,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check release version
+        run: python3 scripts/check_version.py --tag "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+
       - name: Create release ZIP
         run: |
           cd custom_components/hacs_refresh
