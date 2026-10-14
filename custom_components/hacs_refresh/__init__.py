@@ -159,6 +159,8 @@ async def async_setup_entry(
         PLATFORMS,
     )
 
+    entry.async_on_unload(runtime.start_hacs_availability_monitor())
+
     return True
 
 

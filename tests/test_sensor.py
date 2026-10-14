@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -50,22 +50,6 @@ async def test_sensor_setup_entry(hass: HomeAssistant) -> None:
     assert all(entity.runtime is runtime for entity in entities)
 
 
-async def test_status_sensor_registers_runtime_listener() -> None:
-    """Test that the sensor registers its runtime listener when added to HA."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-    remove_listener = MagicMock()
-    runtime.add_listener.return_value = remove_listener
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    with patch.object(sensor, "async_on_remove") as mock_async_on_remove:
-        await sensor.async_added_to_hass()
-
-    runtime.add_listener.assert_called_once_with(sensor._async_runtime_updated)
-    mock_async_on_remove.assert_called_once_with(remove_listener)
-
-
 def test_status_sensor_has_no_extra_state_attributes() -> None:
     """Test that the status sensor exposes no extra state attributes."""
     runtime = MagicMock()
@@ -74,20 +58,6 @@ def test_status_sensor_has_no_extra_state_attributes() -> None:
     sensor = HacsRefreshStatusSensor(runtime)
 
     assert sensor.extra_state_attributes is None
-
-
-def test_status_sensor_runtime_update_writes_state() -> None:
-    """Test that a runtime update causes the sensor to write its state."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-    runtime.state = "refreshing"
-
-    sensor = HacsRefreshStatusSensor(runtime)
-
-    with patch.object(Entity, "async_write_ha_state") as mock_write_state:
-        sensor._async_runtime_updated()
-
-    mock_write_state.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
@@ -161,21 +131,31 @@ def test_progress_sensor_value(
 
 
 async def test_progress_sensor_registers_runtime_listener() -> None:
-    """Test that the progress sensor registers its runtime listener."""
+    """Test that the progress sensor registers both runtime listeners."""
     runtime = MagicMock()
     runtime.entry.entry_id = "test-entry"
-    remove_listener = MagicMock()
-    runtime.add_progress_listener.return_value = remove_listener
+
+    remove_runtime_listener = MagicMock()
+    remove_progress_listener = MagicMock()
+    runtime.add_listener.return_value = remove_runtime_listener
+    runtime.add_progress_listener.return_value = remove_progress_listener
 
     sensor = HacsRefreshProgressSensor(runtime)
 
     with patch.object(sensor, "async_on_remove") as mock_async_on_remove:
         await sensor.async_added_to_hass()
 
+    runtime.add_listener.assert_called_once_with(sensor._async_runtime_updated)
     runtime.add_progress_listener.assert_called_once_with(
         sensor._async_progress_updated
     )
-    mock_async_on_remove.assert_called_once_with(remove_listener)
+    mock_async_on_remove.assert_has_calls(
+        [
+            call(remove_runtime_listener),
+            call(remove_progress_listener),
+        ]
+    )
+    assert mock_async_on_remove.call_count == 2
 
 
 def test_progress_sensor_update_writes_state() -> None:

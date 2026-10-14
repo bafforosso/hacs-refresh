@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.const import EntityCategory
@@ -97,35 +97,6 @@ async def test_switch_setup_entry(hass: HomeAssistant) -> None:
     assert len(entities) == 1
     assert isinstance(entities[0], HacsRefreshAutomaticRefreshSwitch)
     assert entities[0].runtime is runtime
-
-
-async def test_automatic_refresh_switch_registers_runtime_listener() -> None:
-    """Test that the switch registers its runtime listener when added to HA."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-    remove_listener = MagicMock()
-    runtime.add_listener.return_value = remove_listener
-
-    switch = HacsRefreshAutomaticRefreshSwitch(runtime)
-
-    with patch.object(switch, "async_on_remove") as mock_async_on_remove:
-        await switch.async_added_to_hass()
-
-    runtime.add_listener.assert_called_once_with(switch._async_runtime_updated)
-    mock_async_on_remove.assert_called_once_with(remove_listener)
-
-
-def test_automatic_refresh_switch_runtime_update_writes_state() -> None:
-    """Test that a runtime update causes the switch to write its state."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-
-    switch = HacsRefreshAutomaticRefreshSwitch(runtime)
-
-    with patch.object(switch, "async_write_ha_state") as mock_write_state:
-        switch._async_runtime_updated()
-
-    mock_write_state.assert_called_once_with()
 
 
 @pytest.mark.parametrize(

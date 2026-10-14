@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 from homeassistant.util.json import JsonObjectType
 
@@ -101,6 +102,7 @@ class HacsRefreshRuntimeData:
         self.hass = hass
         self.entry = entry
         self.hacs = HacsAdapter(hass)
+        self._hacs_available = self.hacs.available
         self.scheduler: HacsRefreshScheduler | None = None
         self._store = HacsRefreshStore(hass)
         self._refresh_lock = asyncio.Lock()
@@ -240,6 +242,24 @@ class HacsRefreshRuntimeData:
         """Notify listeners of a runtime or configuration change."""
         for listener in tuple(self._listeners):
             self._notify_listener(listener)
+
+    def start_hacs_availability_monitor(self) -> Callable[[], None]:
+        """Monitor HACS availability and notify entities when it changes."""
+        return async_track_time_interval(
+            self.hass,
+            self._async_check_hacs_availability,
+            timedelta(seconds=30),
+        )
+
+    @callback
+    def _async_check_hacs_availability(self, _now: datetime) -> None:
+        """Notify entities when HACS becomes available or unavailable."""
+        available = self.hacs.available
+        if available == self._hacs_available:
+            return
+
+        self._hacs_available = available
+        self.notify_listeners()
 
     async def async_refresh(
         self,
