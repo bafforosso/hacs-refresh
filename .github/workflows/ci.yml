@@ -63,7 +63,7 @@ jobs:
 
           for module in "${modules[@]}"; do
             echo "::group::Coverage: ${module}"
-            uv run --locked coverage report "$module"
+            uv run --locked coverage report --fail-under=95.01 "$module"
             echo "::endgroup::"
           done
 
