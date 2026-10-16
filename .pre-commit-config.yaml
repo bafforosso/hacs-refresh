@@ -20,3 +20,12 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+
+  - repo: local
+    hooks:
+      - id: check-version-consistency
+        name: Check version consistency
+        entry: uv run --locked python scripts/check_version.py
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -23,6 +23,23 @@ def assert_progress_accounting(
         assert progress.remaining == progress.total - progress.processed
 
 
+def test_hacs_availability_reflects_presence_and_disabled_state(
+    hass: HomeAssistant,
+    hacs: MagicMock,
+) -> None:
+    """Test that HACS availability reflects presence and disabled state."""
+    adapter = HacsAdapter(hass)
+
+    assert adapter.available is False
+
+    hass.data["hacs"] = hacs
+    hacs.system.disabled = False
+    assert adapter.available is True
+
+    hacs.system.disabled = True
+    assert adapter.available is False
+
+
 async def test_refresh_fails_when_hacs_is_unavailable(
     hass: HomeAssistant,
 ) -> None:

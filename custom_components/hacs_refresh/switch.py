@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -43,11 +43,6 @@ class HacsRefreshAutomaticRefreshSwitch(
     _attr_entity_category = EntityCategory.CONFIG
     _attr_should_poll = False
     _attr_unique_id = AUTOMATIC_REFRESH_SWITCH_UNIQUE_ID
-
-    async def async_added_to_hass(self) -> None:
-        """Register the runtime listener."""
-        await super().async_added_to_hass()
-        self.async_on_remove(self.runtime.add_listener(self._async_runtime_updated))
 
     @property
     def is_on(self) -> bool:
@@ -115,8 +110,3 @@ class HacsRefreshAutomaticRefreshSwitch(
                 CONF_AUTOMATIC_REFRESH: False,
             },
         )
-
-    @callback
-    def _async_runtime_updated(self) -> None:
-        """Update the switch."""
-        self.async_write_ha_state()

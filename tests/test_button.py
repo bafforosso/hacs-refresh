@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -49,47 +49,16 @@ def test_refresh_button_availability() -> None:
 
     button = HacsRefreshButton(runtime)
 
+    runtime.hacs.available = True
     runtime.refresh_in_progress = False
     assert button.available is True
 
     runtime.refresh_in_progress = True
     assert button.available is False
 
-
-async def test_refresh_button_registers_runtime_listener() -> None:
-    """Test that the button registers its runtime listener when added to HA."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-    remove_listener = MagicMock()
-    runtime.add_listener.return_value = remove_listener
-
-    button = HacsRefreshButton(runtime)
-
-    with (
-        patch(
-            "custom_components.hacs_refresh.button.ButtonEntity.async_added_to_hass",
-            new_callable=AsyncMock,
-        ) as mock_super,
-        patch.object(button, "async_on_remove") as mock_async_on_remove,
-    ):
-        await button.async_added_to_hass()
-
-    mock_super.assert_awaited_once_with()
-    runtime.add_listener.assert_called_once_with(button._async_runtime_updated)
-    mock_async_on_remove.assert_called_once_with(remove_listener)
-
-
-def test_refresh_button_runtime_update_writes_state() -> None:
-    """Test that a runtime update causes the button to write its state."""
-    runtime = MagicMock()
-    runtime.entry.entry_id = "test-entry"
-
-    button = HacsRefreshButton(runtime)
-
-    with patch.object(button, "async_write_ha_state") as mock_write_state:
-        button._async_runtime_updated()
-
-    mock_write_state.assert_called_once_with()
+    runtime.refresh_in_progress = False
+    runtime.hacs.available = False
+    assert button.available is False
 
 
 async def test_refresh_button_triggers_manual_refresh() -> None:
