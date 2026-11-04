@@ -7,6 +7,9 @@ INTEGRATION_NAME = "HACS Refresh"
 
 MIN_HA_VERSION = "2024.12.0"
 
+DEPRECATED_HA_VERSION = "2026.11.0b0"
+REPAIR_ISSUE_ID = "deprecated_ha_2026_11"
+
 SERVICE_REFRESH = "refresh"
 
 AUTOMATIC_REFRESH_SWITCH_UNIQUE_ID = "hacs_refresh_automatic_refresh"
