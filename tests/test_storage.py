@@ -4,10 +4,11 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import DOMAIN
 from custom_components.hacs_refresh.storage import HacsRefreshStore
+
+from .compat import MockConfigEntry
 
 
 async def test_ignores_legacy_refresh_storage(

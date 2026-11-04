@@ -3,10 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import (
-    MockModule,
-    mock_integration,
-)
+
+from .compat import MockModule, mock_integration
 
 
 @pytest.fixture

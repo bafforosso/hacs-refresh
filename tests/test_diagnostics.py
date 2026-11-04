@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
@@ -19,6 +18,8 @@ from custom_components.hacs_refresh.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.hacs_refresh.runtime import HacsRefreshRuntimeData
+
+from .compat import MockConfigEntry
 
 
 async def test_diagnostics_default_values(

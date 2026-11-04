@@ -14,7 +14,6 @@ from homeassistant.exceptions import (
     HomeAssistantError,
     ServiceValidationError,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh import (
     PLATFORMS,
@@ -39,6 +38,8 @@ from custom_components.hacs_refresh.runtime import HacsRefreshOutcome
 from custom_components.hacs_refresh.switch import (
     HacsRefreshAutomaticRefreshSwitch,
 )
+
+from .compat import MockConfigEntry
 
 
 def test_platforms() -> None:

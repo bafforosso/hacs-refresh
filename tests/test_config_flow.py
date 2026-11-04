@@ -8,7 +8,6 @@ from homeassistant.helpers.schema_config_entry_flow import (
     SchemaConfigFlowHandler,
     SchemaFlowError,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.config_flow import (
     _options_schema,
@@ -28,6 +27,8 @@ from custom_components.hacs_refresh.const import (
     DOMAIN,
     MAX_TIMES,
 )
+
+from .compat import MockConfigEntry
 
 
 def test_parse_times_normalizes_and_sorts() -> None:
