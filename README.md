@@ -1,16 +1,29 @@
 # HACS Refresh
 
+> [!WARNING]
+> **HACS Refresh is deprecated. The final release is 1.3.1.**
+>
+> HACS Refresh is incompatible with **Home Assistant 2026.11 and newer**.
+>
+> Home Assistant 2026.11 replaces the separately installed HACS custom integration with the built-in Marketplace. Although the Marketplace carries over installed repositories, it does not provide the legacy HACS integration functionality that HACS Refresh depends on.
+>
+> **No Marketplace compatibility update is planned.**
+>
+> If you are still running Home Assistant 2026.10 or older, install HACS Refresh 1.3.1 before upgrading to Home Assistant 2026.11.
+>
+> If you upgraded to Home Assistant 2026.11 or newer while still running HACS Refresh 1.3.0, you will not receive the deprecation Repair notification introduced in 1.3.1. Follow the [removal instructions](#removing-hacs-refresh) below.
+
 [![Made for Home Assistant](https://img.shields.io/badge/Made_for-Home_Assistant-blue?style=flat&logo=homeassistant&logoColor=FFFFFF)](https://www.home-assistant.io/)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange?style=flat&logo=homeassistantcommunitystore&logoColor=FFFFFF)](https://hacs.xyz/)
 [![Tests](https://img.shields.io/github/actions/workflow/status/bafforosso/hacs-refresh/ci.yml?branch=main&style=flat&label=Tests)](https://github.com/bafforosso/hacs-refresh/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/bafforosso/hacs-refresh?style=flat&label=Release&color=blueviolet&logo=github&logoColor=FFFFFF)](https://github.com/bafforosso/hacs-refresh/releases)
 [![License](https://img.shields.io/github/license/bafforosso/hacs-refresh?style=flat&label=License&color=yellow)](LICENSE)
 
-A Home Assistant custom component to help you keep your installed HACS repositories up to date with scheduled or on-demand refreshes.
+HACS Refresh is a Home Assistant custom integration that refreshes metadata for repositories installed through the legacy HACS integration.
 
-HACS normally checks for repository updates automatically, but detection of newly released versions can sometimes be delayed. HACS Refresh complements HACS by giving users more control over when installed repository data is refreshed, either automatically on a schedule or manually whenever needed.
+HACS Refresh was designed to complement HACS by giving users more control over when installed repository data is refreshed, either automatically on a schedule or manually whenever needed.
 
-> *HACS Refresh does not install or upgrade repositories; it only refreshes the metadata HACS uses to detect available updates. Any available update will then appear in Home Assistant's Updates.*
+> *HACS Refresh does not install or upgrade repositories; it only refreshes the metadata used by HACS to detect available updates. Any available update then appears in Home Assistant's Updates.*
 
 ## Features
 
@@ -22,12 +35,26 @@ HACS normally checks for repository updates automatically, but detection of newl
 - **Refresh protection** — prevent scheduled refreshes from running too frequently or overlapping.
 - **Diagnostics** — view configuration and runtime details for troubleshooting.
 
-## Requirements
+## Compatibility
 
-- **Home Assistant 2024.12.0 or newer**
-- **HACS 2.0.0 or newer**
+HACS Refresh 1.3.1 is the final release.
+
+| Component | Supported versions |
+| --- | --- |
+| Home Assistant | 2024.12.0 through 2026.10.x |
+| HACS | 2.0.0 or newer, on supported Home Assistant versions |
+
+**Home Assistant 2026.11.0 and newer are not supported.**
+
+HACS Refresh depends on the legacy HACS custom integration. Starting with Home Assistant 2026.11, HACS is replaced by the built-in Marketplace, which does not provide the legacy HACS integration functionality required by HACS Refresh.
+
+No Marketplace compatibility update is planned.
 
 ## Installation
+
+The installation instructions below apply only to Home Assistant 2024.12.0 through 2026.10.x.
+
+Do not install HACS Refresh on Home Assistant 2026.11 or newer.
 
 ### HACS (recommended)
 
@@ -219,6 +246,76 @@ Its `attributes` provide further details about the refresh:
 | `message` | `str` | Conditional | Human-readable text | Refresh issue or error. |
 
 The `message` field is included when the refresh produces a message and omitted otherwise.
+
+## Removing HACS Refresh
+
+Removing HACS Refresh involves two separate steps: deleting its integration entry from Home Assistant and uninstalling its downloaded repository.
+
+### 1. Review automations, scripts and dashboards
+
+Before removing HACS Refresh, review your automations, scripts and dashboards for references to its action and entities.
+
+The action is:
+
+- `hacs_refresh.refresh`
+
+The default entity IDs are:
+
+- `button.hacs_refresh_refresh` — Refresh button
+- `switch.hacs_refresh_automatic_refresh` — Automatic refresh switch
+- `sensor.hacs_refresh_status` — Status sensor
+- `sensor.hacs_refresh_progress` — Progress sensor
+- `event.hacs_refresh_refresh_completed` — Refresh completed event
+
+Entity IDs may differ if you have renamed them.
+
+Remove or replace any references that are no longer needed.
+
+### 2. Delete the Home Assistant integration entry
+
+1. Go to **Settings → Devices & services → Integrations**.
+2. Find **HACS Refresh**.
+3. Open its three-dot menu and select **Delete**.
+4. Confirm the deletion.
+
+This removes the HACS Refresh config entry and its associated entities from Home Assistant.
+
+### 3. Uninstall the downloaded repository
+
+The downloaded integration files are separate from the Home Assistant config entry. Uninstall the repository using the method through which it was installed.
+
+**If you use legacy HACS (Home Assistant 2026.10 or older):**
+
+1. Open HACS.
+2. Find **HACS Refresh**.
+3. Open its three-dot menu.
+4. Select **Remove**.
+
+**If you use the built-in Marketplace (Home Assistant 2026.11 or newer):**
+
+1. Go to **Settings → Marketplace**.
+2. Open the **Installed** tab.
+3. Find **HACS Refresh**.
+4. Select it and choose **Uninstall**.
+
+**If you installed HACS Refresh manually:**
+
+1. Remove the `custom_components/hacs_refresh` directory from your Home Assistant configuration directory.
+2. Restart Home Assistant.
+
+### 4. Restart and verify
+
+Restart Home Assistant if requested after uninstalling the repository.
+
+Check your automations, scripts and dashboards again to ensure they no longer reference HACS Refresh.
+
+No manual `.storage` or database editing is necessary.
+
+### Need help?
+
+The GitHub issue tracker remains available for bugs affecting supported Home Assistant versions and reasonable transition-related problems.
+
+Please understand that new features and Home Assistant Marketplace compatibility are outside the scope of this project.
 
 ## License
 

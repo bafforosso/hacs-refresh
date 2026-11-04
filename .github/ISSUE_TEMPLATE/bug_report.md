@@ -1,12 +1,18 @@
 ---
 name: Bug report
-about: Create a report to help improve HACS Refresh
+about: Report a bug affecting a supported version of HACS Refresh
 title: "[BUG]"
 labels: bug
 assignees: ''
 type: Bug
 
 ---
+
+> **HACS Refresh is deprecated.**
+>
+> The final release is 1.3.1. HACS Refresh supports Home Assistant 2024.12.0 through 2026.10.x only.
+>
+> Home Assistant 2026.11 and newer are unsupported. No Marketplace compatibility update is planned.
 
 ## Describe the bug
 
