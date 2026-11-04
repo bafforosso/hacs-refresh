@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -14,6 +15,7 @@ from homeassistant.exceptions import (
     HomeAssistantError,
     ServiceValidationError,
 )
+from homeassistant.helpers import issue_registry as ir
 
 from custom_components.hacs_refresh import (
     PLATFORMS,
@@ -25,9 +27,11 @@ from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
     CONF_DAYS,
     CONF_TIMES,
+    DEPRECATED_HA_VERSION,
     DOMAIN,
     MIN_HA_VERSION,
     REFRESH_SOURCE_MANUAL,
+    REPAIR_ISSUE_ID,
     SERVICE_REFRESH,
 )
 from custom_components.hacs_refresh.hacs import (
@@ -40,6 +44,21 @@ from custom_components.hacs_refresh.switch import (
 )
 
 from .compat import MockConfigEntry
+
+SUPPORTS_CONFIG_ENTRY_ISSUE_OWNERSHIP = (
+    "config_entry_id" in inspect.signature(ir.async_create_issue).parameters
+)
+
+
+@pytest.fixture(autouse=True)
+def default_home_assistant_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run normal-operation tests against the last supported HA release."""
+    monkeypatch.setattr(
+        "custom_components.hacs_refresh.HAVERSION",
+        "2026.10.4",
+    )
 
 
 def test_platforms() -> None:
@@ -60,6 +79,29 @@ async def test_service_is_registered(hass: HomeAssistant) -> None:
     assert await async_setup(hass, {})
 
     assert hass.services.has_service(DOMAIN, SERVICE_REFRESH)
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        DEPRECATED_HA_VERSION,
+        "2026.11.0b5",
+        "2026.11.0",
+        "2026.12.0",
+    ],
+)
+async def test_service_is_not_registered_on_deprecated_versions(
+    hass: HomeAssistant,
+    version: str,
+) -> None:
+    """Test that the refresh service is not registered on deprecated HA versions."""
+    with patch(
+        "custom_components.hacs_refresh.HAVERSION",
+        version,
+    ):
+        assert await async_setup(hass, {})
+
+    assert not hass.services.has_service(DOMAIN, SERVICE_REFRESH)
 
 
 async def test_refresh_service_requires_config_entry(
@@ -669,6 +711,68 @@ async def test_setup_entry_options_update_reconfigures_scheduler(
         mock_notify_listeners.assert_called_once_with()
 
 
+@pytest.mark.skipif(
+    not SUPPORTS_CONFIG_ENTRY_ISSUE_OWNERSHIP,
+    reason="Config-entry-owned Repairs require Home Assistant 2026.11",
+)
+async def test_setup_entry_creates_deprecation_repair_without_initializing(
+    hass: HomeAssistant,
+) -> None:
+    """Test deprecated setup creates one linked Repair and skips initialization."""
+    config_entry = MockConfigEntry(domain=DOMAIN)
+    config_entry.add_to_hass(hass)
+
+    # The deprecated path must not depend on the old HACS integration.
+    hass.data.pop("hacs", None)
+
+    forward_entry_setups = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.hacs_refresh.HAVERSION",
+            "2026.11.0b5",
+        ),
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshRuntimeData",
+        ) as runtime_class,
+        patch(
+            "custom_components.hacs_refresh.HacsRefreshScheduler",
+        ) as scheduler_class,
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            forward_entry_setups,
+        ),
+    ):
+        assert await async_setup_entry(hass, config_entry)
+
+        # Repeated setup must update the same issue, not create another one.
+        assert await async_setup_entry(hass, config_entry)
+
+    runtime_class.assert_not_called()
+    scheduler_class.assert_not_called()
+    forward_entry_setups.assert_not_awaited()
+
+    issue_registry = ir.async_get(hass)
+    issue = issue_registry.async_get_issue(DOMAIN, REPAIR_ISSUE_ID)
+
+    assert issue is not None
+    assert issue.config_entry_id == config_entry.entry_id
+    assert issue.is_fixable is False
+    assert issue.severity is ir.IssueSeverity.ERROR
+    assert issue.translation_key == "deprecated"
+
+    assert (
+        sum(issue_domain == DOMAIN for issue_domain, _issue_id in issue_registry.issues)
+        == 1
+    )
+
+    # Home Assistant should automatically remove the linked Repair.
+    await hass.config_entries.async_remove(config_entry.entry_id)
+
+    assert issue_registry.async_get_issue(DOMAIN, REPAIR_ISSUE_ID) is None
+
+
 async def test_switch_option_update_reconfigures_scheduler(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -849,3 +953,26 @@ async def test_unload_entry_unloads_platforms(
         config_entry,
         PLATFORMS,
     )
+
+
+async def test_unload_entry_on_deprecated_version(
+    hass: HomeAssistant,
+) -> None:
+    """Test deprecated entries unload without forwarding platforms."""
+    config_entry = MockConfigEntry(domain=DOMAIN)
+    config_entry.add_to_hass(hass)
+
+    with (
+        patch(
+            "custom_components.hacs_refresh.HAVERSION",
+            DEPRECATED_HA_VERSION,
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_unload_platforms",
+            new_callable=AsyncMock,
+        ) as unload_platforms,
+    ):
+        assert await async_unload_entry(hass, config_entry)
+
+    unload_platforms.assert_not_awaited()

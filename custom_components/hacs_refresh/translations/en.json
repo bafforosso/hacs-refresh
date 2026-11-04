@@ -96,6 +96,12 @@
       "message": "Unexpected error while refreshing HACS repositories."
     }
   },
+  "issues": {
+    "deprecated": {
+      "title": "HACS Refresh is no longer supported",
+      "description": "HACS Refresh is incompatible with Home Assistant 2026.11 and newer. Home Assistant replaced the legacy HACS integration with the built-in Marketplace, which HACS Refresh does not support.\n\nRemove HACS Refresh from Settings > Devices & services > Integrations.\n\nBefore removing it, review your automations, scripts and dashboards for references to HACS Refresh entities and the `hacs_refresh.refresh` action.\n\nNo compatibility update is planned."
+    }
+  },
   "options": {
     "step": {
       "init": {

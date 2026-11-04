@@ -37,6 +37,13 @@ pythonpath = ["."]
 testpaths = ["tests"]
 timeout = 60
 
+[tool.ruff.lint]
+extend-select = ["DTZ001", "DTZ007"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
+
 [tool.uv]
 package = false
 environments = [

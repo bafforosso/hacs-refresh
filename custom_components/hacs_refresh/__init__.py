@@ -7,8 +7,10 @@ from typing import Any
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.const import __version__ as HAVERSION
+from homeassistant.const import (
+    Platform,
+    __version__ as HAVERSION,
+)
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -20,12 +22,17 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     ServiceValidationError,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import (
+    config_validation as cv,
+    issue_registry as ir,
+)
 
 from .const import (
+    DEPRECATED_HA_VERSION,
     DOMAIN,
     MIN_HA_VERSION,
     REFRESH_SOURCE_MANUAL,
+    REPAIR_ISSUE_ID,
     SERVICE_REFRESH,
 )
 from .hacs import HacsInvalidRepositoriesError
@@ -53,11 +60,18 @@ SERVICE_REFRESH_SCHEMA = vol.Schema(
 )
 
 
+def _is_deprecated() -> bool:
+    """Return whether the current Home Assistant version is unsupported."""
+    return AwesomeVersion(HAVERSION) >= AwesomeVersion(DEPRECATED_HA_VERSION)
+
+
 async def async_setup(
     hass: HomeAssistant,
     config: dict[str, Any],
 ) -> bool:
     """Set up HACS Refresh."""
+    if _is_deprecated():
+        return True
 
     async def async_refresh(
         call: ServiceCall,
@@ -131,6 +145,18 @@ async def async_setup_entry(
             translation_placeholders={"version": MIN_HA_VERSION},
         )
 
+    if _is_deprecated():
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            REPAIR_ISSUE_ID,
+            config_entry_id=entry.entry_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="deprecated",
+        )
+        return True
+
     if hass.data.get("hacs") is None:
         raise ConfigEntryNotReady("HACS is not available yet")
 
@@ -178,6 +204,9 @@ async def async_unload_entry(
     entry: HacsRefreshConfigEntry,
 ) -> bool:
     """Unload HACS Refresh."""
+    if _is_deprecated():
+        return True
+
     return await hass.config_entries.async_unload_platforms(
         entry,
         PLATFORMS,

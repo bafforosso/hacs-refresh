@@ -5,7 +5,7 @@
     "@bafforosso"
   ],
   "config_flow": true,
-  "dependencies": [
+  "after_dependencies": [
     "hacs"
   ],
   "documentation": "https://github.com/bafforosso/hacs-refresh",
