@@ -1,13 +1,13 @@
 name: Validate with hassfest
 
+# Scheduled testing discontinued following the HACS Refresh sunset.
+# Manual execution remains available for troubleshooting or verification.
 on:
   push:
     branches:
       - main
       - dev
   pull_request:
-  schedule:
-    - cron: "35 0 * * 0"
   workflow_dispatch:
 
 concurrency:
