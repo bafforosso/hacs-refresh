@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     DOMAIN,
@@ -34,6 +33,8 @@ from custom_components.hacs_refresh.runtime import (
     HacsRefreshSkipped,
 )
 from custom_components.hacs_refresh.storage import LastRefreshData
+
+from .compat import MockConfigEntry
 
 
 def _refresh_result(

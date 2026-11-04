@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     CONF_AUTOMATIC_REFRESH,
@@ -17,6 +16,8 @@ from custom_components.hacs_refresh.const import (
 )
 from custom_components.hacs_refresh.runtime import HacsRefreshRuntimeData
 from custom_components.hacs_refresh.scheduler import HacsRefreshScheduler
+
+from .compat import MockConfigEntry
 
 
 async def test_scheduler_does_not_register_when_disabled(

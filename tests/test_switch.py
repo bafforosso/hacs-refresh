@@ -5,7 +5,6 @@ import pytest
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hacs_refresh.const import (
     AUTOMATIC_REFRESH_SWITCH_UNIQUE_ID,
@@ -18,6 +17,8 @@ from custom_components.hacs_refresh.switch import (
     HacsRefreshAutomaticRefreshSwitch,
     async_setup_entry,
 )
+
+from .compat import MockConfigEntry
 
 
 @pytest.mark.parametrize("automatic_refresh", [True, False])
