@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -757,7 +757,7 @@ async def test_setup_entry_creates_deprecation_repair_without_initializing(
     issue = issue_registry.async_get_issue(DOMAIN, REPAIR_ISSUE_ID)
 
     assert issue is not None
-    assert issue.config_entry_id == config_entry.entry_id
+    assert cast(Any, issue).config_entry_id == config_entry.entry_id
     assert issue.is_fixable is False
     assert issue.severity is ir.IssueSeverity.ERROR
     assert issue.translation_key == "deprecated"

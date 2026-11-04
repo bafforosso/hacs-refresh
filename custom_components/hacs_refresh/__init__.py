@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
@@ -146,7 +146,7 @@ async def async_setup_entry(
         )
 
     if _is_deprecated():
-        ir.async_create_issue(
+        cast(Any, ir.async_create_issue)(
             hass,
             DOMAIN,
             REPAIR_ISSUE_ID,
